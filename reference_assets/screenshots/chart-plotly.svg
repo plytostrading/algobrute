@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <rect width="100%" height="100%" fill="#111827"/>
+  <text x="50%" y="45%" text-anchor="middle" fill="#e5e7eb" font-family="Inter, sans-serif" font-size="42">Plotly.js Chart Implementation (Placeholder)</text>
+  <text x="50%" y="52%" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="20">Candlestick + Volume Subplot • SMA Overlays • Golden/Death Cross Signals</text>
+  <rect x="150" y="600" width="1100" height="40" fill="#1f2937" rx="8"/>
+  <text x="700" y="626" text-anchor="middle" fill="#cbd5e1" font-size="16">Replace with actual Plotly.js chart screenshot</text>
+</svg>
