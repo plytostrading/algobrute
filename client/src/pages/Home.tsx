@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2, AlertTriangle, Eye, Server, ChevronRight } from 'lucide-react';
+import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2, AlertTriangle, Eye, Server, ChevronRight, Database, Layers } from 'lucide-react';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -34,7 +34,7 @@ export default function Home() {
       {/* Background Texture */}
       <div className="fixed inset-0 z-0 opacity-30 pointer-events-none">
         <img 
-          src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/0LtwFffZQmWF6fBhqsuSm5-img-2_1770441977000_na1fn_ZGF0YV9zdHJlYW1fYmc.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94LzBMdHdGZmZaUW1XRjZmQmhxc3VTbTUtaW1nLTJfMTc3MDQ0MTk3NzAwMF9uYTFmbl9aR0YwWVY5emRISmxZVzFmWW1jLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=spYtVgE1WSz7l31wLbYMMUlf~mWnd0c310snXM4oEs6wYWhKlSAk5zgqVThQxdcf~GYihrcUOEPtJK~ExilQIHpEYj4oAYb7G5FLVkffgHGYJx~UAWniacBp4Wf8DUOicEu5oagGTICKb5jd5eZm2LoJTtDgCZjIKaiR-sssEEcWAvY342JoyaGhlAqZnEQHapJ~0sPH2NN33aVP97MTvsuy0lUEzGgKQFveCATafbKVQaeOw7BcYdqfkcjAEK1t3kFP1DGB9hVjWuE76fJW6nJYFnpSsM56nA~hCnjNmYEYMJNwcdy4gN-3EeK4s-AhAkwazfVElTCGUvP6GZOf5A__" 
+          src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/0LtwFffZQmWF6fBhqsuSm5-img-2_1770441977000_na1fn_ZGF0YV9zdHJlYW1fYmc.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94LzBMdHdGZmZaUW1XRjZmQmhxc3VTbTUtaW1nLTJfMTc3MDQ0MTk3NzAwMF9uYTFmbl9aGF0YV9zdHJlYW1fYmcucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=spYtVgE1WSz7l31wLbYMMUlf~mWnd0c310snXM4oEs6wYWhKlSAk5zgqVThQxdcf~GYihrcUOEPtJK~ExilQIHpEYj4oAYb7G5FLVkffgHGYJx~UAWniacBp4Wf8DUOicEu5oagGTICKb5jd5eZm2LoJTtDgCZjIKaiR-sssEEcWAvY342JoyaGhlAqZnEQHapJ~0sPH2NN33aVP97MTvsuy0lUEzGgKQFveCATafbKVQaeOw7BcYdqfkcjAEK1t3kFP1DGB9hVjWuE76fJW6nJYFnpSsM56nA~hCnjNmYEYMJNwcdy4gN-3EeK4s-AhAkwazfVElTCGUvP6GZOf5A__" 
           alt="" 
           className="w-full h-full object-cover"
         />
@@ -157,9 +157,9 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 items-stretch">
             {/* Input Side */}
-            <div className="bg-[#0A0A0A] border border-[#333] p-8 h-full flex flex-col">
+            <div className="bg-[#0A0A0A] border border-[#333] p-8 flex flex-col h-full">
               <div className="flex items-center gap-2 mb-6 text-[#00FF41]">
                 <Terminal className="w-6 h-6" />
                 <span className="font-bold tracking-widest text-sm">STRATEGY_INPUT</span>
@@ -187,20 +187,83 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Output Side */}
-            <div className="relative min-h-[400px] flex items-center justify-center bg-[#0A0A0A] border border-[#333] p-4 overflow-hidden">
+            {/* Output Side - Live Strategy Card */}
+            <div className="relative min-h-[400px] flex items-center justify-center bg-[#0A0A0A] border border-[#333] p-8 overflow-hidden">
               {!showStrategyCard ? (
                 <div className="text-center text-gray-600">
                   <Code className="w-16 h-16 mx-auto mb-4 opacity-20" />
                   <p className="font-mono text-sm">WAITING_FOR_INPUT...</p>
                 </div>
               ) : (
-                <div className="animate-in fade-in zoom-in duration-500 w-full">
-                  <img 
-                    src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/Qg7Yyx5VQXs7Jyj3oeyyZy-img-1_1770441548000_na1fn_ZW5nbGlzaF90b19jb2RlX3Yy.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L1FnN1l5eDVWUVhzN0p5ajNvZXl5WnktaW1nLTFfMTc3MDQ0MTU0ODAwMF9uYTFmbl9aVzVuYkdsemFGOTBiMTlqYjJSbFgzWXkucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=J~GKkaiadmhyaf7JMitei1Y0VM~Z-3hCFwoRHwxjYBQ-TdhSVqBUH5aniDD05XPsFJS3kF7dIn06GtrQgx6QgJdAXMfRWfgYI9jK3stSnzd-DF~uH3xBwLtnv9HH-2yiHeIy2ikxxPNU8keST8jd6xrJ7JCWQVIA4BYyy-dnJZ5NuGDnq7-oM68qd-n2vLuSYeNzoHd76BrYYzjR46zFDvjI5xKDPJOXSZGDGbMab0YknHragBe2VlJfXfUobBI1OdzUpMr8p4g3lEUF4oYxgE2l4uDy1nTgQAlU1JER7MUePbbFQkVwTtCzVey-ufePqg2A7Ht83qOTAwp3WuEytg__" 
-                    alt="Generated Strategy Card" 
-                    className="w-full shadow-2xl border border-[#333]"
-                  />
+                <div className="animate-in fade-in zoom-in duration-500 w-full max-w-md">
+                  {/* Structured Data Card */}
+                  <div className="bg-[#050505] border border-[#333] shadow-2xl font-mono text-sm relative overflow-hidden group hover:border-[#00FF41] transition-colors">
+                    {/* Card Header */}
+                    <div className="bg-[#111] border-b border-[#333] p-3 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-4 h-4 text-[#00FF41]" />
+                        <span className="font-bold text-gray-300">STRATEGY_OBJECT</span>
+                      </div>
+                      <span className="text-xs text-gray-600">ID: GEN-8821</span>
+                    </div>
+                    
+                    {/* Card Body */}
+                    <div className="p-6 space-y-4">
+                      {/* Asset & Direction */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-gray-500 text-xs block mb-1">ASSET</span>
+                          <span className="text-[#00FF41] font-bold text-lg">SPY</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs block mb-1">DIRECTION</span>
+                          <span className="text-[#00FF41] font-bold text-lg">LONG</span>
+                        </div>
+                      </div>
+
+                      {/* Entry Rules */}
+                      <div>
+                        <span className="text-gray-500 text-xs block mb-2">ENTRY_RULES</span>
+                        <div className="bg-[#111] border border-[#333] p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
+                            <span className="text-gray-300">RSI(14) &lt; 30</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
+                            <span className="text-gray-300">Price &gt; SMA(200)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Exit Rules */}
+                      <div>
+                        <span className="text-gray-500 text-xs block mb-2">EXIT_RULES</span>
+                        <div className="bg-[#111] border border-[#333] p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-red-500"></div>
+                            <span className="text-gray-300">RSI(14) &gt; 70</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-red-500"></div>
+                            <span className="text-gray-300">Stop Loss: 2.0%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Risk Model */}
+                      <div className="pt-4 border-t border-[#333] flex justify-between items-center">
+                        <span className="text-gray-500 text-xs">RISK_MODEL</span>
+                        <div className="flex items-center gap-2 text-[#00FF41]">
+                          <Shield className="w-3 h-3" />
+                          <span className="font-bold text-xs">ADAPTIVE_VOLATILITY</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Decorative Corner */}
+                    <div className="absolute top-0 right-0 w-0 h-0 border-t-[20px] border-r-[20px] border-t-transparent border-r-[#00FF41]/20"></div>
+                  </div>
                 </div>
               )}
             </div>
