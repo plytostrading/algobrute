@@ -1,110 +1,74 @@
 # AlgoBrute: Product Proposal & Go-to-Market Strategy
 
 ## 1. Executive Summary
-**AlgoBrute** (formerly InsightTrader) is an institutional-grade algorithmic trading infrastructure designed for the sophisticated retail trader. Unlike competitors that gamify gambling or offer black-box "copy trading," AlgoBrute provides a transparent, code-first environment for rigorous backtesting, risk management, and automated execution.
+**AlgoBrute** (formerly InsightTrader) is an algorithmic trading infrastructure designed for the **intermediate retail trader**. We bridge the gap between manual charting tools and complex institutional software.
 
-**Mission**: To democratize the scientific method in financial markets, replacing emotional speculation with engineered precision.
+**Mission**: To empower traders to automate their best ideas and sleep at night knowing their risk is managed.
 
 ---
 
 ## 2. Market Analysis
 
 ### 2.1 The Problem
-The retail trading market is bifurcated:
-1.  **Gambling Apps**: Robinhood, eToro. Focus on UI/UX, gamification, and encouraging over-trading. High churn, low sophistication.
-2.  **Institutional Platforms**: Bloomberg, specialized quant software. Prohibitively expensive ($24k+/yr), complex UX, inaccessible to individuals.
+Intermediate traders are stuck. They have moved beyond "gambling" on Robinhood but find professional tools like Bloomberg or custom Python coding too expensive or time-consuming. They want to automate their strategies but lack the technical bridge to do so reliably.
 
-There is a "missing middle": The **Sophisticated Retail Trader**. This user understands markets, knows technical analysis, perhaps codes a little (Python/JS), but lacks the infrastructure to rigorously test their ideas before risking capital. They are currently cobbling together TradingView scripts, Excel sheets, and Python notebooks.
-
-### 2.2 Target Audience (The "Stickiest" Customer)
-*   **Persona**: "The Engineer-Trader"
-*   **Demographics**: Male, 25-45, STEM background (Software Engineers, Data Scientists, Engineers).
-*   **Psychographics**: Values precision, hates ambiguity, skeptical of "get rich quick" schemes, willing to pay for tools that give a perceived "edge."
+### 2.2 Target Audience
+*   **Persona**: "The Aspiring Systematizer"
+*   **Demographics**: 25-45, likely has a day job, trades part-time.
+*   **Psychographics**: Wants to remove emotion from trading. Values consistency over "moonshots."
 *   **Pain Points**:
-    *   Fear of drawdown/ruin.
-    *   Frustration with emotional execution errors.
-    *   Inability to validate strategies historically (backtesting).
+    *   "I can't watch the charts 24/7."
+    *   "I panic sell/buy and ruin my strategy."
+    *   "I don't have time to learn complex coding."
 
-### 2.3 Competitive Landscape
-| Competitor | Positioning | Weakness | AlgoBrute Advantage |
-| :--- | :--- | :--- | :--- |
-| **TradingView** | Charting & Social | PineScript is limited; backtesting is often inaccurate (repainting). | Real Python/SDO execution; rigorous walk-forward analysis. |
-| **QuantConnect** | Hardcore Quant | Extremely high learning curve (C#/Python); intimidating for semi-pros. | LLM-assisted strategy generation lowers the barrier to entry. |
-| **Composer.trade** | No-code Algo | "Black box" feel; limited customization; simplistic logic. | "Glass box" transparency; full control over signal hierarchy. |
+### 2.3 Competitive Landscape & Pricing Context
+*   **TradingView**: ~$15-$60/mo. Great charts, poor automation.
+*   **Composer.trade**: ~$24-$32/mo. Good no-code, but "black box" feel.
+*   **TrendSpider**: ~$49-$100+/mo. Expensive for many.
 
----
-
-## 3. TAM / SAM / SOM Analysis
-
-### Total Addressable Market (TAM)
-**Global Retail Trading Market**: Estimated at **$10.2 Billion** (2023).
-*   Includes all retail brokerage accounts and trading software spend.
-*   *Source: Business Research Insights, Retail Trading Platform Market Report.*
-
-### Serviceable Available Market (SAM)
-**Active "Pro-sumer" Traders**: Estimated **$1.5 Billion**.
-*   Traders who pay for premium subscriptions (TradingView Pro, Benzinga, etc.).
-*   Approx. 15% of the total retail market are considered "active" or "sophisticated."
-
-### Serviceable Obtainable Market (SOM)
-**AlgoBrute's Year 1-3 Target**: **$10 Million ARR**.
-*   Targeting **0.6%** of the SAM.
-*   **Calculation**:
-    *   Goal: $1M ARR (Year 1) -> $10M ARR (Year 3).
-    *   At an average revenue per user (ARPU) of $100/mo ($1,200/yr):
-    *   **833 subscribers** needed for $1M ARR.
-    *   **8,333 subscribers** needed for $10M ARR.
-*   *Conclusion*: The $1M ARR goal is highly conservative and achievable with fewer than 1,000 core users.
+**AlgoBrute Opportunity**: Offer a "Glass Box" solution (transparent logic) at a price point that feels like a no-brainer for someone already paying for data or newsletters.
 
 ---
 
-## 4. Pricing Strategy
-We utilize a tiered SaaS model that aligns price with the value of **compute** and **data quality**.
+## 3. Revised Pricing Strategy
+We are moving to a simplified, accessible pricing model that encourages adoption while covering data costs.
 
-### Tier 1: ANALYST ($49/mo)
-*   *Target*: The curious validator.
+### **Tier 1: STARTER ($29/mo)**
+*   *For the trader ready to test their ideas.*
 *   **Features**:
-    *   End-of-Day (EOD) Data only.
-    *   Basic Backtesting Engine (Standard metrics).
-    *   5 Active Strategy Slots.
-    *   Community Support.
+    *   **Unlimited Backtesting** (EOD Data).
+    *   **5 Active "Paper" Bots**.
+    *   **LLM Strategy Discovery** (Standard Speed).
+    *   Basic Risk Guardrails.
 
-### Tier 2: QUANT ($149/mo) - **Core Growth Driver**
-*   *Target*: The active algo trader.
+### **Tier 2: PRO ($79/mo)**
+*   *For the trader ready to automate live.*
 *   **Features**:
-    *   **Real-time Data** (Polygon.io integration).
-    *   **LLM Strategy Discovery** (The "Killer Feature").
-    *   **Regime Detection** (Walk-forward analysis).
-    *   Unlimited Strategy Slots.
-    *   Automated Execution (Paper Trading).
+    *   **Real-time Data** (Polygon.io).
+    *   **Unlimited Active Bots**.
+    *   **Live Execution** (Broker Integration).
+    *   **Advanced Regime Detection**.
+    *   **Priority LLM Access**.
 
-### Tier 3: INSTITUTIONAL ($499/mo)
-*   *Target*: Small family offices / HNW individuals.
-*   **Features**:
-    *   Live Broker Execution (Alpaca/IBKR).
-    *   Dedicated Server Instance (Low latency).
-    *   Custom Data Integrations.
-    *   Priority Support.
+*(Removed "Institutional" tier entirely to focus on the core retail user.)*
 
 ---
 
-## 5. Product Roadmap & Execution
+## 4. Core Stories & Messaging
 
-### Phase 1: The "Truth" Engine (Current)
-*   Focus on the **Backtester**. It must be trusted implicitly.
-*   Launch the "Micro-Experiment" marketing campaign.
-*   Deliver the LLM Discovery Pipeline to generate strategies from plain English.
+### Story 1: "From English to Execution"
+*   **The Hook**: You don't need to be a Python wizard to build a bot.
+*   **The Promise**: Describe your strategy in plain English ("Buy when RSI is below 30 and price is above the 200 SMA"). AlgoBrute converts it into a rigorous, testable strategy instantly.
+*   **The Benefit**: Speed of iteration. Test 10 ideas in the time it used to take to code one.
 
-### Phase 2: The "Guardrails" (Q3 2026)
-*   Implement the **Risk Management Protocol**.
-*   "Kill Switch" features that prevent emotional overrides.
-*   Portfolio-level risk analysis (correlation matrices).
-
-### Phase 3: The "Autopilot" (Q4 2026)
-*   Full live execution with major brokerages.
-*   Marketplace for verified SDO v2 strategies (users can sell their alphas).
+### Story 2: "The Sleep-at-Night Guarantee"
+*   **The Hook**: The biggest risk to your portfolio is *you*.
+*   **The Promise**: Our hard-coded Risk Guardrails act as your external discipline officer. Max daily loss limits, position sizing rules, and volatility filters are enforced by the machine, not your willpower.
+*   **The Benefit**: Emotional freedom. Let the bot handle the execution while you live your life.
 
 ---
 
-## 6. Conclusion
-AlgoBrute is positioned to capture the high-value segment of the retail trading market by treating them with respect—offering professional-grade tools rather than gamified distractions. By focusing on **transparency**, **rigor**, and **automation**, we solve the primary cause of retail failure: emotional decision-making.
+## 5. Next Steps
+1.  **Update Website Copy**: Rewrite the landing page to reflect these two core stories and the new pricing.
+2.  **Simplify Visuals**: Ensure the "terminal" look remains accessible, not intimidating.
+3.  **Launch Waitlist**: Capture emails for the "Starter" tier.

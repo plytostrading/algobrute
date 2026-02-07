@@ -1,5 +1,5 @@
 import React from 'react';
-import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock } from 'lucide-react';
+import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -14,11 +14,11 @@ export default function Home() {
             </div>
             <div className="hidden md:block">
               <div className="flex items-baseline space-x-8 text-sm">
-                <a href="#features" className="hover:text-[#00FF41] transition-colors">MODULES</a>
-                <a href="#pricing" className="hover:text-[#00FF41] transition-colors">ACCESS</a>
+                <a href="#features" className="hover:text-[#00FF41] transition-colors">CAPABILITIES</a>
+                <a href="#pricing" className="hover:text-[#00FF41] transition-colors">PRICING</a>
                 <a href="#research" className="hover:text-[#00FF41] transition-colors">RESEARCH</a>
                 <button className="border border-[#00FF41] text-[#00FF41] px-4 py-2 hover:bg-[#00FF41] hover:text-black transition-all duration-100 uppercase text-xs font-bold">
-                  Initialize Terminal
+                  Launch Terminal
                 </button>
               </div>
             </div>
@@ -40,20 +40,19 @@ export default function Home() {
                 <span className="text-xs text-gray-400 uppercase tracking-widest">System Operational v2.4.0</span>
               </div>
               <h1 className="text-5xl lg:text-7xl font-bold tracking-tighter leading-none mb-6">
-                INSTITUTIONAL<br />
-                <span className="text-[#333]">GRADE</span><br />
-                EXECUTION
+                AUTOMATE YOUR<br />
+                <span className="text-[#333]">EDGE</span>
               </h1>
               <p className="text-xl text-gray-400 mb-8 max-w-lg font-sans">
-                Stop gambling. Start engineering. AlgoBrute provides the infrastructure for sophisticated retail traders to backtest, validate, and execute algorithmic strategies with institutional precision.
+                Turn your trading ideas into automated bots without writing a single line of code. We handle the execution, risk management, and infrastructure. You handle the alpha.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <button className="bg-[#00FF41] text-black px-8 py-4 font-bold uppercase tracking-wider hover:bg-white transition-colors flex items-center justify-center gap-2 group">
-                  Start Backtest
+                  Start Building Free
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
                 <button className="border border-[#333] text-gray-300 px-8 py-4 font-bold uppercase tracking-wider hover:border-white hover:text-white transition-colors">
-                  View Documentation
+                  See How It Works
                 </button>
               </div>
             </div>
@@ -96,118 +95,72 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Features Grid */}
+      {/* Story 1: Idea to Execution */}
       <section id="features" className="py-24 border-b border-[#333]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold mb-4">CORE_MODULES</h2>
-            <div className="w-24 h-1 bg-[#00FF41]"></div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="group border border-[#333] bg-[#0A0A0A] hover:border-[#00FF41] transition-colors p-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center mb-24">
+            <div>
               <div className="mb-6 text-[#00FF41]">
-                <Terminal className="w-10 h-10" />
+                <Zap className="w-12 h-12" />
               </div>
-              <h3 className="text-xl font-bold mb-4">NATURAL LANGUAGE DISCOVERY</h3>
-              <p className="text-gray-400 text-sm leading-relaxed font-sans mb-6">
-                Convert plain English trade ideas into executable SDO v2 JSON strategies. Our LLM pipeline parses price action, news, and fundamentals with strict signal hierarchy.
+              <h2 className="text-3xl font-bold mb-6">FROM ENGLISH TO <br/>EXECUTION IN SECONDS</h2>
+              <p className="text-gray-400 text-lg mb-6 font-sans">
+                You don't need to be a Python wizard to build a bot. Just describe your strategy in plain English.
               </p>
-              <ul className="text-xs text-gray-500 space-y-2 font-mono">
-                <li className="flex items-center gap-2">
-                  <span className="w-1 h-1 bg-[#00FF41]"></span>
-                  PROMPT_ENGINEERING_V5
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1 h-1 bg-[#00FF41]"></span>
-                  SIGNAL_HIERARCHY_ENFORCEMENT
-                </li>
-              </ul>
+              <div className="bg-[#111] border border-[#333] p-6 mb-6 font-mono text-sm text-gray-300">
+                <span className="text-[#00FF41]">{">"}</span> "Buy SPY when RSI is below 30 and price is above the 200-day moving average. Sell when RSI hits 70."
+              </div>
+              <p className="text-gray-400 font-sans">
+                AlgoBrute's engine instantly converts your words into a rigorous, backtestable strategy code. Test 10 ideas in the time it used to take to code one.
+              </p>
             </div>
-
-            {/* Feature 2 */}
-            <div className="group border border-[#333] bg-[#0A0A0A] hover:border-[#00FF41] transition-colors p-8">
-              <div className="mb-6 text-[#00F0FF]">
-                <Activity className="w-10 h-10" />
-              </div>
-              <h3 className="text-xl font-bold mb-4">REGIME-AWARE BACKTESTING</h3>
-              <p className="text-gray-400 text-sm leading-relaxed font-sans mb-6">
-                Don't just backtest price. Backtest context. Our engine detects market regimes (volatility, trend, changepoints) to validate strategy robustness across different environments.
-              </p>
-              <ul className="text-xs text-gray-500 space-y-2 font-mono">
-                <li className="flex items-center gap-2">
-                  <span className="w-1 h-1 bg-[#00F0FF]"></span>
-                  WALK_FORWARD_ANALYSIS
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1 h-1 bg-[#00F0FF]"></span>
-                  MONTE_CARLO_SIMULATION
-                </li>
-              </ul>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="group border border-[#333] bg-[#0A0A0A] hover:border-[#00FF41] transition-colors p-8">
-              <div className="mb-6 text-red-500">
-                <Shield className="w-10 h-10" />
-              </div>
-              <h3 className="text-xl font-bold mb-4">INSTITUTIONAL RISK GUARDRAILS</h3>
-              <p className="text-gray-400 text-sm leading-relaxed font-sans mb-6">
-                Hard-coded risk limits that prevent emotional trading. Set max drawdown, daily loss limits, and position sizing rules that cannot be overridden during live trading.
-              </p>
-              <ul className="text-xs text-gray-500 space-y-2 font-mono">
-                <li className="flex items-center gap-2">
-                  <span className="w-1 h-1 bg-red-500"></span>
-                  KILL_SWITCH_PROTOCOL
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1 h-1 bg-red-500"></span>
-                  DYNAMIC_POSITION_SIZING
-                </li>
-              </ul>
+            <div className="relative">
+               <img 
+                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/FNo529hNiiEV1Hu0kNj2kt-img-4_1770440333000_na1fn_ZmVhdHVyZV9hdXRvbWF0aW9u.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L0ZObzUyOWhOaWlFVjFIdTBrTmoya3QtaW1nLTRfMTc3MDQ0MDMzMzAwMF9uYTFmbl9abVZoZEhWeVpWOWhkWFJ2YldGMGFXOXUucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=WPAw1~-p-m74Badri6ErD7B2ZSOowYoaxhjyWK4lay-4yXweMaAKNSfG5z20bks9b-hhuAh8FT86nP0fzt0jECXbNbKTdChjeN95iJBb9MiagHk8JQnwyBgViIkyOMUxh6zNd4nSgqzYM7lKMmkRh~De4fMLpcKcWGjfZAaAs-gMtY56sYqR7zJnDqkdvFeTyU-09McWyDll1zHwDQz9~L7c0vCbHhUOUavRBo7hbfH8L1iySLYzZrnp6WjhRx8-fQJmcxeyioA98P~l4AoaFkyS6ZI0ay-bksaLG~l1O3uuJz4~tmN5sT7Qe85DsoD87efQOrQQpIRLdSi1RujtMg__" 
+                alt="Automation Visualization" 
+                className="w-full border border-[#333] grayscale hover:grayscale-0 transition-all duration-500"
+              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Deep Dive Section */}
+      {/* Story 2: Sleep at Night */}
       <section className="py-24 bg-[#080808]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="order-2 lg:order-1">
               <img 
-                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/FNo529hNiiEV1Hu0kNj2kt-img-2_1770440321000_na1fn_ZmVhdHVyZV9iYWNrdGVzdA.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L0ZObzUyOWhOaWlFVjFIdTBrTmoya3QtaW1nLTJfMTc3MDQ0MDMyMTAwMF9uYTFmbl9abVZoZEhWeVpWOWlZV05yZEdWemRBLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=aEtRqZsqftg5nGlhfBnnWP2clqzxxc8RbaHS58Nf5~ngPf14x8tZuU4-Fl-HU3OvkfQQfUvYgtNSbjnkf~q4WKvXagRCExSUy02bBsZiaLkNwh4MmaIWn1Plhvt2EK~x3lIPQ1JcPllwnOLY441sFZ4L3yq-pOkPd8JhMZ0EyZBFVZ1dcHHbSVBrUm1TzT-~bB5dB4OGIhWdqvUOHyl2ggTrSoY9eB5zgufsAQw9AEAkD~sLbe36ZT09eIInXgpYnewwGBblMUpPT9F3N0oU3h-ji2lpmnkT3cwC9fFAFlguxaIWgA5a6gIwMxt~NqaQpQgq9J2UnS-KSaYIHRevyQ__" 
-                alt="Backtesting Engine" 
+                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/FNo529hNiiEV1Hu0kNj2kt-img-3_1770440330000_na1fn_ZmVhdHVyZV9yaXNr.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L0ZObzUyOWhOaWlFVjFIdTBrTmoya3QtaW1nLTNfMTc3MDQ0MDMzMDAwMF9uYTFmbl9abVZoZEhWeVpWOXlhWE5yLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=CvkUcNFSevY1JUqM5veOYX5XzDLzYVjrscDmgJevYcnZUysU~LDZjKHNNtudT2W72kitGqqEZXEH6uK-KXBkDTYIfEV1PSX-F9PvjhLkrXdYVlHN4e578ySjN0D7FL9R9wzzTFbfFMPdlCmW-~~eVvX5I74F33VI1IHFPv0oB3ew6vikfkyDghvEXosQOTVMqwyL5-7MtLx~J6CbEkhsx3fZ-emFCVWI4Wwo6s53OgmsJ36m8HEzl9udJrYBb-PCYWQ6iDe6pjLD5A1KPWZ2IoMNSNip8wLtJTTObchj9gh4iHuVYI2vGQCRBQyYOG98UKqs3J2SISfu56RwzbFwbQ__" 
+                alt="Risk Management Shield" 
                 className="w-full border border-[#333] grayscale hover:grayscale-0 transition-all duration-500"
               />
             </div>
             <div className="order-1 lg:order-2">
-              <h2 className="text-3xl font-bold mb-6">THE <span className="text-[#00FF41]">MICRO-EXPERIMENT</span> ETHOS</h2>
+              <div className="mb-6 text-[#00F0FF]">
+                <Moon className="w-12 h-12" />
+              </div>
+              <h2 className="text-3xl font-bold mb-6">THE "SLEEP AT NIGHT" <br/>GUARANTEE</h2>
               <p className="text-gray-400 text-lg mb-6 font-sans">
-                Most retail traders fail because they treat trading as gambling. AlgoBrute forces you to treat it as science.
+                The biggest risk to your portfolio isn't the market. It's you.
               </p>
               <p className="text-gray-400 mb-8 font-sans">
-                Every strategy is a hypothesis. Every backtest is an experiment. Our platform provides the laboratory conditions necessary to isolate variables, test assumptions, and prove alpha before risking a single dollar of capital.
+                Our hard-coded Risk Guardrails act as your external discipline officer. Max daily loss limits, position sizing rules, and volatility filters are enforced by the machine, not your willpower.
               </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="border border-[#333] p-4">
-                  <div className="text-2xl font-bold text-white mb-1">158+</div>
-                  <div className="text-xs text-gray-500">TA-LIB INDICATORS</div>
-                </div>
-                <div className="border border-[#333] p-4">
-                  <div className="text-2xl font-bold text-white mb-1">61</div>
-                  <div className="text-xs text-gray-500">CANDLESTICK PATTERNS</div>
-                </div>
-                <div className="border border-[#333] p-4">
-                  <div className="text-2xl font-bold text-white mb-1">4</div>
-                  <div className="text-xs text-gray-500">DATA PROVIDERS</div>
-                </div>
-                <div className="border border-[#333] p-4">
-                  <div className="text-2xl font-bold text-white mb-1">0ms</div>
-                  <div className="text-xs text-gray-500">EMOTIONAL LATENCY</div>
-                </div>
-              </div>
+              <ul className="space-y-4 font-mono text-sm text-gray-300">
+                <li className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-[#00FF41]" />
+                  <span>AUTOMATED STOP LOSSES</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-[#00FF41]" />
+                  <span>VOLATILITY REGIME FILTERS</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-[#00FF41]" />
+                  <span>MAX DRAWDOWN KILL-SWITCH</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
@@ -217,64 +170,49 @@ export default function Home() {
       <section id="pricing" className="py-24 border-t border-[#333]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">ACCESS_TIERS</h2>
+            <h2 className="text-3xl font-bold mb-4">SIMPLE PRICING</h2>
             <p className="text-gray-400 max-w-2xl mx-auto font-sans">
-              Transparent pricing for serious traders. No hidden fees. No commission skimming.
+              Professional tools at a price that makes sense for your portfolio size.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Tier 1 */}
             <div className="border border-[#333] bg-[#0A0A0A] p-8 flex flex-col">
               <div className="mb-4">
-                <h3 className="text-xl font-bold">ANALYST</h3>
-                <div className="text-3xl font-bold mt-2">$49<span className="text-sm text-gray-500 font-normal">/mo</span></div>
+                <h3 className="text-xl font-bold">STARTER</h3>
+                <div className="text-3xl font-bold mt-2">$29<span className="text-sm text-gray-500 font-normal">/mo</span></div>
+                <p className="text-xs text-gray-500 mt-2 font-sans">Perfect for testing and validation.</p>
               </div>
               <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-400 font-sans">
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Basic Backtesting Engine</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> 5 Active Strategies</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> EOD Data (Tiingo/Finnhub)</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Community Support</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Unlimited Backtesting</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> 5 Active "Paper" Bots</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> End-of-Day Data</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Basic Risk Guardrails</li>
               </ul>
               <button className="w-full border border-[#333] py-3 hover:bg-white hover:text-black transition-colors uppercase font-bold text-sm">
-                Select Plan
+                Start Free Trial
               </button>
             </div>
 
             {/* Tier 2 */}
             <div className="border border-[#00FF41] bg-[#0A0A0A] p-8 flex flex-col relative transform md:-translate-y-4">
               <div className="absolute top-0 left-0 w-full h-1 bg-[#00FF41]"></div>
-              <div className="absolute top-4 right-4 text-[10px] bg-[#00FF41] text-black px-2 py-1 font-bold">RECOMMENDED</div>
+              <div className="absolute top-4 right-4 text-[10px] bg-[#00FF41] text-black px-2 py-1 font-bold">MOST POPULAR</div>
               <div className="mb-4">
-                <h3 className="text-xl font-bold text-[#00FF41]">QUANT</h3>
-                <div className="text-3xl font-bold mt-2">$149<span className="text-sm text-gray-500 font-normal">/mo</span></div>
+                <h3 className="text-xl font-bold text-[#00FF41]">PRO</h3>
+                <div className="text-3xl font-bold mt-2">$79<span className="text-sm text-gray-500 font-normal">/mo</span></div>
+                <p className="text-xs text-gray-400 mt-2 font-sans">For traders ready to automate live.</p>
               </div>
               <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-300 font-sans">
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Advanced Regime Detection</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Unlimited Strategies</li>
                 <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Real-time Data (Polygon.io)</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> LLM Strategy Generation</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Automated Execution</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Unlimited Active Bots</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Live Broker Execution</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Advanced Regime Detection</li>
+                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Priority LLM Access</li>
               </ul>
               <button className="w-full bg-[#00FF41] text-black py-3 hover:bg-white transition-colors uppercase font-bold text-sm">
-                Select Plan
-              </button>
-            </div>
-
-            {/* Tier 3 */}
-            <div className="border border-[#333] bg-[#0A0A0A] p-8 flex flex-col">
-              <div className="mb-4">
-                <h3 className="text-xl font-bold">INSTITUTIONAL</h3>
-                <div className="text-3xl font-bold mt-2">$499<span className="text-sm text-gray-500 font-normal">/mo</span></div>
-              </div>
-              <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-400 font-sans">
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Dedicated Infrastructure</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Custom Data Integrations</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> White-glove Onboarding</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Priority API Access</li>
-              </ul>
-              <button className="w-full border border-[#333] py-3 hover:bg-white hover:text-black transition-colors uppercase font-bold text-sm">
-                Contact Sales
+                Get Started
               </button>
             </div>
           </div>
@@ -291,7 +229,7 @@ export default function Home() {
                 <span className="text-xl font-bold tracking-tighter">ALGOBRUTE</span>
               </div>
               <p className="text-gray-500 text-sm max-w-xs font-sans">
-                Algorithmic trading infrastructure for the sophisticated retail trader. Built on the principles of scientific rigor and risk management.
+                Algorithmic trading infrastructure for the intermediate retail trader. Built to automate your edge and protect your capital.
               </p>
             </div>
             <div>
