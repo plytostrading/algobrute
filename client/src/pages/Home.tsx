@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2, AlertTriangle, Eye, Server, ChevronRight, Database, Layers, TrendingUp, DollarSign, Sliders } from 'lucide-react';
+import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2, AlertTriangle, Eye, Server, ChevronRight, Database, Layers, TrendingUp, DollarSign, Sliders, RefreshCw, Settings } from 'lucide-react';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -10,17 +10,75 @@ export default function Home() {
   const [strategyInput, setStrategyInput] = useState('Buy SPY when RSI < 30 and Price > 200 SMA');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showStrategyCard, setShowStrategyCard] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState('CUSTOM');
   
   // Risk Simulation State
   const [volatility, setVolatility] = useState(20); // 0-100
   const [isDeployed, setIsDeployed] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
 
+  // Backtest Simulation State
+  const [marketRegime, setMarketRegime] = useState('BULL_2021');
+  const [slippage, setSlippage] = useState(10); // ms
+  const [isSimulating, setIsSimulating] = useState(false);
+
   // Derived Risk Values
   const stopLoss = Math.max(0.5, (2.5 - (volatility / 100) * 2)).toFixed(1);
   const takeProfit = (stopLoss * 2.5).toFixed(1);
   const riskMode = volatility > 60 ? 'DEFENSIVE' : volatility > 30 ? 'BALANCED' : 'AGGRESSIVE';
   const riskColor = volatility > 60 ? 'text-red-500' : volatility > 30 ? 'text-yellow-500' : 'text-[#00FF41]';
+
+  // Derived Backtest Values
+  const getBacktestMetrics = () => {
+    const baseReturn = marketRegime === 'BULL_2021' ? 42.5 : marketRegime === 'BEAR_2022' ? 12.4 : -5.2;
+    const slippagePenalty = slippage * 0.05;
+    const finalReturn = (baseReturn - slippagePenalty).toFixed(1);
+    const sharpe = (marketRegime === 'BULL_2021' ? 2.4 : marketRegime === 'BEAR_2022' ? 1.1 : 0.4) - (slippage * 0.002);
+    const drawdown = marketRegime === 'CRASH_2020' ? 28.5 : marketRegime === 'BEAR_2022' ? 15.2 : 8.4;
+    
+    return {
+      return: finalReturn,
+      sharpe: sharpe.toFixed(2),
+      drawdown: drawdown.toFixed(1),
+      winRate: marketRegime === 'BULL_2021' ? 68 : 54
+    };
+  };
+
+  const metrics = getBacktestMetrics();
+
+  const presets = {
+    CUSTOM: {
+      label: "Custom Strategy",
+      input: "Buy SPY when RSI < 30 and Price > 200 SMA",
+      type: "MEAN_REVERSION",
+      asset: "SPY"
+    },
+    IRON_CONDOR: {
+      label: "Iron Condor (Options)",
+      input: "Sell SPY Iron Condor: Short 30 delta Call/Put, Long 10 delta wings. DTE: 45. Close at 50% profit.",
+      type: "OPTIONS_STRATEGY",
+      asset: "SPY_OPT"
+    },
+    GOLDEN_CROSS: {
+      label: "Golden Cross Trend",
+      input: "Buy BTC when 50 SMA crosses above 200 SMA. Sell when 50 SMA crosses below 200 SMA.",
+      type: "TREND_FOLLOWING",
+      asset: "BTC"
+    },
+    VOL_BREAKOUT: {
+      label: "Volatility Breakout",
+      input: "Buy ETH when Price > 20-day High and Volume > 200% Avg. Stop Loss: 2 ATR.",
+      type: "BREAKOUT",
+      asset: "ETH"
+    }
+  };
+
+  const handlePresetChange = (presetKey: string) => {
+    setSelectedPreset(presetKey);
+    setStrategyInput(presets[presetKey as keyof typeof presets].input);
+    setShowStrategyCard(false);
+    setIsDeployed(false);
+  };
 
   const handleWaitlistSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,12 +234,23 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-stretch">
+          <div className="grid lg:grid-cols-2 gap-12 items-stretch mb-12">
             {/* Input Side */}
             <div className="bg-[#0A0A0A] border border-[#333] p-8 flex flex-col h-full">
-              <div className="flex items-center gap-2 mb-6 text-[#00FF41]">
-                <Terminal className="w-6 h-6" />
-                <span className="font-bold tracking-widest text-sm">STRATEGY_INPUT</span>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2 text-[#00FF41]">
+                  <Terminal className="w-6 h-6" />
+                  <span className="font-bold tracking-widest text-sm">STRATEGY_INPUT</span>
+                </div>
+                <select 
+                  value={selectedPreset}
+                  onChange={(e) => handlePresetChange(e.target.value)}
+                  className="bg-[#111] border border-[#333] text-xs text-gray-300 px-3 py-1 focus:outline-none focus:border-[#00FF41]"
+                >
+                  {Object.entries(presets).map(([key, preset]) => (
+                    <option key={key} value={key}>{preset.label}</option>
+                  ))}
+                </select>
               </div>
               <textarea 
                 className="w-full bg-[#050505] border border-[#333] p-4 text-lg text-gray-300 font-mono focus:outline-none focus:border-[#00FF41] transition-colors resize-none flex-1 min-h-[200px] mb-6"
@@ -233,11 +302,11 @@ export default function Home() {
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <span className="text-gray-500 text-xs block mb-1">ASSET</span>
-                            <span className="text-[#00FF41] font-bold text-lg">SPY</span>
+                            <span className="text-[#00FF41] font-bold text-lg">{presets[selectedPreset as keyof typeof presets].asset}</span>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs block mb-1">DIRECTION</span>
-                            <span className="text-[#00FF41] font-bold text-lg">LONG</span>
+                            <span className="text-gray-500 text-xs block mb-1">TYPE</span>
+                            <span className="text-[#00FF41] font-bold text-lg">{presets[selectedPreset as keyof typeof presets].type}</span>
                           </div>
                         </div>
 
@@ -361,11 +430,11 @@ export default function Home() {
                           <span className="text-gray-500 text-xs block mb-2">RECENT_ACTIVITY</span>
                           <div className="space-y-2">
                             <div className="flex justify-between items-center text-xs border-b border-[#333] pb-2">
-                              <span className="text-gray-300">Bought SPY @ $412.50</span>
+                              <span className="text-gray-300">Bought {presets[selectedPreset as keyof typeof presets].asset} @ Market</span>
                               <span className="text-gray-500">10:42 AM</span>
                             </div>
                             <div className="flex justify-between items-center text-xs border-b border-[#333] pb-2">
-                              <span className="text-gray-300">Stop Loss Adjusted {'->'} $410.20</span>
+                              <span className="text-gray-300">Stop Loss Adjusted &rarr; Dynamic</span>
                               <span className="text-[#00FF41]">RISK_ENGINE</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
@@ -387,43 +456,89 @@ export default function Home() {
               )}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Backtest Validation Section */}
-      <section className="py-24 border-b border-[#333] z-10 relative bg-[#050505]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div className="order-2 lg:order-1">
-              <img 
-                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/tmVZDPFK8wT8Dg1QHzMwOz-img-1_1770442673000_na1fn_YmFja3Rlc3RfcmVwb3J0X3Yx.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L3RtVlpEUEZLOHdUOERnMVFIek13T3otaW1nLTFfMTc3MDQ0MjY3MzAwMF9uYTFmbl9ZbUZqYTNSbGMzUmZjbVZ3YjNKMFgzWXgucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=MKyhq0QZ5V~gaLTOjqQXi~~CQI3n8eC1LVCBUsJS2D9ZjGFM4qNYUGubRH90ZTfbZodZFZomFuhhIKmKMyjMGgCNU6h1d~-rX2mubr3NhZ2MOrF2O7qJdi6C~hPPhmdV6nrIrplpHtkQoi3btDoPRT68T2fGiS1vIKmmkB1g3lSaYS7t5ZQd9zU1m8n6eJsyQ10ugx~3gv8ajFwlbCsvtWKIAYphU8IIRwpBukMZpJR32Q4p8hvOSAIYkIjC1JzSBlIWp4541Fyd6sBu-hqhEtZsPeFclD9~ZUeusxvoTTlZDRknoapUSnyqkHJrk85oKuXVLhczfpPIGpWEpFtBzw__" 
-                alt="Backtest Report" 
-                className="w-full border border-[#333] shadow-2xl hover:border-[#00FF41] transition-colors duration-500"
-              />
-            </div>
-            <div className="order-1 lg:order-2">
-              <div className="inline-flex items-center gap-2 border border-[#333] bg-[#111] px-3 py-1 mb-6">
+          {/* Live Backtesting Component */}
+          <div className="border border-[#333] bg-[#0A0A0A] p-1">
+            <div className="bg-[#111] border-b border-[#333] px-4 py-2 flex justify-between items-center">
+              <div className="flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-[#00FF41]" />
-                <span className="text-xs text-gray-400 uppercase tracking-widest">VALIDATION_ENGINE</span>
+                <span className="text-xs font-bold text-gray-300 tracking-widest">WALK_FORWARD_SIMULATION</span>
               </div>
-              <h2 className="text-4xl font-bold mb-6">REGIME-AWARE BACKTESTING</h2>
-              <p className="text-gray-400 text-lg font-sans mb-8">
-                Don't just test against price. Test against market regimes. Our engine simulates volatility shocks, liquidity crunches, and trend reversals to ensure your bot survives the real world.
-              </p>
-              <ul className="space-y-4 font-mono text-sm text-gray-300">
-                <li className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
-                  <span>Walk-Forward Optimization</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
-                  <span>Monte Carlo Simulations</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
-                  <span>Slippage & Commission Modeling</span>
-                </li>
-              </ul>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-500 uppercase">Market Regime</span>
+                  <select 
+                    value={marketRegime}
+                    onChange={(e) => setMarketRegime(e.target.value)}
+                    className="bg-[#050505] border border-[#333] text-[10px] text-gray-300 px-2 py-1 focus:outline-none focus:border-[#00FF41]"
+                  >
+                    <option value="BULL_2021">BULL_2021 (Easy Mode)</option>
+                    <option value="BEAR_2022">BEAR_2022 (High Vol)</option>
+                    <option value="CRASH_2020">CRASH_2020 (Stress Test)</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 w-32">
+                  <span className="text-[10px] text-gray-500 uppercase">Slippage: {slippage}ms</span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="500" 
+                    step="10"
+                    value={slippage} 
+                    onChange={(e) => setSlippage(parseInt(e.target.value))}
+                    className="w-full h-1 bg-[#333] rounded-lg appearance-none cursor-pointer accent-[#00FF41]"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid lg:grid-cols-3 gap-1 p-8">
+              {/* Chart Area */}
+              <div className="lg:col-span-2 h-64 relative border border-[#333] bg-[#050505] p-4 flex items-end">
+                {/* Simulated Chart Lines */}
+                <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                  {/* Grid Lines */}
+                  <line x1="0" y1="25%" x2="100%" y2="25%" stroke="#333" strokeDasharray="4" />
+                  <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#333" strokeDasharray="4" />
+                  <line x1="0" y1="75%" x2="100%" y2="75%" stroke="#333" strokeDasharray="4" />
+                  
+                  {/* Monte Carlo Paths (Faint) */}
+                  <path d={`M0,100 Q50,${100 - metrics.winRate} 100,${marketRegime === 'CRASH_2020' ? 150 : 50}`} fill="none" stroke="#333" strokeWidth="1" className="opacity-30" />
+                  <path d={`M0,100 Q50,${110 - metrics.winRate} 100,${marketRegime === 'CRASH_2020' ? 140 : 60}`} fill="none" stroke="#333" strokeWidth="1" className="opacity-30" />
+                  
+                  {/* Main Equity Curve */}
+                  <path 
+                    d={`M0,100 C30,${100 - (parseFloat(metrics.return) * 0.5)} 70,${100 - (parseFloat(metrics.return) * 1.2)} 100,${100 - (parseFloat(metrics.return) * 2)}`} 
+                    fill="none" 
+                    stroke={parseFloat(metrics.return) > 0 ? "#00FF41" : "#EF4444"} 
+                    strokeWidth="2" 
+                    className="drop-shadow-[0_0_10px_rgba(0,255,65,0.2)] transition-all duration-500 ease-out"
+                  />
+                </svg>
+                <div className="absolute top-4 left-4 text-xs text-gray-500">EQUITY_CURVE (MONTE_CARLO_AVG)</div>
+              </div>
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 gap-4 content-start">
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Total Return</div>
+                  <div className={`text-2xl font-bold ${parseFloat(metrics.return) > 0 ? 'text-[#00FF41]' : 'text-red-500'}`}>
+                    {parseFloat(metrics.return) > 0 ? '+' : ''}{metrics.return}%
+                  </div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Sharpe Ratio</div>
+                  <div className="text-2xl font-bold text-white">{metrics.sharpe}</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Max Drawdown</div>
+                  <div className="text-2xl font-bold text-red-500">-{metrics.drawdown}%</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Win Rate</div>
+                  <div className="text-2xl font-bold text-white">{metrics.winRate}%</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
