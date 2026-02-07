@@ -6,10 +6,10 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   
-  // Pipeline Demo State
-  const [pipelineStep, setPipelineStep] = useState(0); // 0: Input, 1: Strategy, 2: Backtest, 3: Live Bot
+  // Widget State
   const [strategyInput, setStrategyInput] = useState('Buy SPY when RSI < 30 and Price > 200 SMA');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showStrategyCard, setShowStrategyCard] = useState(false);
 
   const handleWaitlistSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,17 +21,12 @@ export default function Home() {
     }, 1500);
   };
 
-  const advancePipeline = () => {
-    if (pipelineStep >= 3) return;
-    setIsProcessing(true);
+  const generateStrategy = () => {
+    setIsGenerating(true);
     setTimeout(() => {
-      setPipelineStep(prev => prev + 1);
-      setIsProcessing(false);
+      setIsGenerating(false);
+      setShowStrategyCard(true);
     }, 1500);
-  };
-
-  const resetPipeline = () => {
-    setPipelineStep(0);
   };
 
   return (
@@ -152,137 +147,136 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Full-Width Pipeline Demo */}
+      {/* Interactive Widget Section */}
       <section id="features" className="py-24 border-b border-[#333] z-10 relative bg-[#050505]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">THE PIPELINE</h2>
+            <h2 className="text-4xl font-bold mb-4">FROM ENGLISH TO EXECUTION</h2>
             <p className="text-gray-400 max-w-2xl mx-auto font-sans text-lg">
-              From plain English to a live, risk-managed trading bot in four steps.
+              Describe your strategy in plain language. Our LLM engine compiles it into a rigorous, backtestable algorithm instantly.
             </p>
           </div>
 
-          {/* Pipeline Stepper */}
-          <div className="flex justify-between items-center max-w-4xl mx-auto mb-12 relative">
-            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[#333] -z-10"></div>
-            {['INPUT', 'STRATEGY', 'BACKTEST', 'LIVE BOT'].map((step, index) => (
-              <div key={step} className={`flex flex-col items-center gap-2 bg-[#050505] px-4 ${index <= pipelineStep ? 'text-[#00FF41]' : 'text-gray-600'}`}>
-                <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-500 ${index <= pipelineStep ? 'border-[#00FF41] bg-[#00FF41]/10' : 'border-[#333] bg-[#111]'}`}>
-                  {index + 1}
-                </div>
-                <span className="text-xs font-bold tracking-widest">{step}</span>
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Input Side */}
+            <div className="bg-[#0A0A0A] border border-[#333] p-8 h-full flex flex-col">
+              <div className="flex items-center gap-2 mb-6 text-[#00FF41]">
+                <Terminal className="w-6 h-6" />
+                <span className="font-bold tracking-widest text-sm">STRATEGY_INPUT</span>
               </div>
-            ))}
-          </div>
-
-          {/* Interactive Display Area */}
-          <div className="border border-[#333] bg-[#0A0A0A] p-2 max-w-6xl mx-auto relative min-h-[600px] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#333] bg-[#111] mb-2">
-              <span className="text-xs text-gray-500">
-                {pipelineStep === 0 && 'STEP_01: NATURAL_LANGUAGE_INPUT'}
-                {pipelineStep === 1 && 'STEP_02: STRATEGY_COMPILATION'}
-                {pipelineStep === 2 && 'STEP_03: BACKTEST_VALIDATION'}
-                {pipelineStep === 3 && 'STEP_04: LIVE_EXECUTION_MONITOR'}
-              </span>
-              <div className="flex gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#333]"></div>
-                <div className="w-2 h-2 rounded-full bg-[#333]"></div>
-              </div>
+              <textarea 
+                className="w-full bg-[#050505] border border-[#333] p-4 text-lg text-gray-300 font-mono focus:outline-none focus:border-[#00FF41] transition-colors resize-none flex-1 min-h-[200px] mb-6"
+                value={strategyInput}
+                onChange={(e) => setStrategyInput(e.target.value)}
+              />
+              <button 
+                onClick={generateStrategy}
+                disabled={isGenerating}
+                className="w-full bg-[#00FF41] text-black py-4 font-bold hover:bg-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    COMPILING...
+                  </>
+                ) : (
+                  <>
+                    GENERATE STRATEGY <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
             </div>
 
-            <div className="flex-1 flex items-center justify-center p-8 relative overflow-hidden">
-              {/* Step 0: Input */}
-              {pipelineStep === 0 && (
-                <div className="w-full max-w-2xl animate-in fade-in zoom-in duration-500">
-                  <div className="mb-4 text-[#00FF41] flex justify-center">
-                    <Terminal className="w-16 h-16" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-center mb-8">DESCRIBE YOUR STRATEGY</h3>
-                  <div className="relative">
-                    <textarea 
-                      className="w-full bg-[#050505] border border-[#333] p-6 text-lg text-gray-300 font-mono focus:outline-none focus:border-[#00FF41] transition-colors resize-none h-48 shadow-2xl"
-                      value={strategyInput}
-                      onChange={(e) => setStrategyInput(e.target.value)}
-                    />
-                    <button 
-                      onClick={advancePipeline}
-                      className="absolute bottom-6 right-6 bg-[#00FF41] text-black px-6 py-2 font-bold hover:bg-white transition-colors flex items-center gap-2"
-                    >
-                      GENERATE <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
+            {/* Output Side */}
+            <div className="relative min-h-[400px] flex items-center justify-center bg-[#0A0A0A] border border-[#333] p-4 overflow-hidden">
+              {!showStrategyCard ? (
+                <div className="text-center text-gray-600">
+                  <Code className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                  <p className="font-mono text-sm">WAITING_FOR_INPUT...</p>
                 </div>
-              )}
-
-              {/* Step 1: Strategy Card */}
-              {pipelineStep === 1 && (
-                <div className="w-full max-w-4xl animate-in fade-in slide-in-from-right duration-500">
+              ) : (
+                <div className="animate-in fade-in zoom-in duration-500 w-full">
                   <img 
                     src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/Qg7Yyx5VQXs7Jyj3oeyyZy-img-1_1770441548000_na1fn_ZW5nbGlzaF90b19jb2RlX3Yy.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L1FnN1l5eDVWUVhzN0p5ajNvZXl5WnktaW1nLTFfMTc3MDQ0MTU0ODAwMF9uYTFmbl9aVzVuYkdsemFGOTBiMTlqYjJSbFgzWXkucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=J~GKkaiadmhyaf7JMitei1Y0VM~Z-3hCFwoRHwxjYBQ-TdhSVqBUH5aniDD05XPsFJS3kF7dIn06GtrQgx6QgJdAXMfRWfgYI9jK3stSnzd-DF~uH3xBwLtnv9HH-2yiHeIy2ikxxPNU8keST8jd6xrJ7JCWQVIA4BYyy-dnJZ5NuGDnq7-oM68qd-n2vLuSYeNzoHd76BrYYzjR46zFDvjI5xKDPJOXSZGDGbMab0YknHragBe2VlJfXfUobBI1OdzUpMr8p4g3lEUF4oYxgE2l4uDy1nTgQAlU1JER7MUePbbFQkVwTtCzVey-ufePqg2A7Ht83qOTAwp3WuEytg__" 
-                    alt="Strategy Card" 
-                    className="w-full border border-[#333] shadow-2xl"
+                    alt="Generated Strategy Card" 
+                    className="w-full shadow-2xl border border-[#333]"
                   />
-                  <div className="mt-8 flex justify-center">
-                    <button 
-                      onClick={advancePipeline}
-                      className="bg-[#00FF41] text-black px-8 py-3 font-bold hover:bg-white transition-colors flex items-center gap-2"
-                    >
-                      RUN BACKTEST <Play className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      </section>
 
-              {/* Step 2: Backtest Report */}
-              {pipelineStep === 2 && (
-                <div className="w-full max-w-5xl animate-in fade-in slide-in-from-right duration-500">
-                  <img 
-                    src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/tmVZDPFK8wT8Dg1QHzMwOz-img-1_1770442673000_na1fn_YmFja3Rlc3RfcmVwb3J0X3Yx.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L3RtVlpEUEZLOHdUOERnMVFIek13T3otaW1nLTFfMTc3MDQ0MjY3MzAwMF9uYTFmbl9ZbUZqYTNSbGMzUmZjbVZ3YjNKMFgzWXgucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=MKyhq0QZ5V~gaLTOjqQXi~~CQI3n8eC1LVCBUsJS2D9ZjGFM4qNYUGubRH90ZTfbZodZFZomFuhhIKmKMyjMGgCNU6h1d~-rX2mubr3NhZ2MOrF2O7qJdi6C~hPPhmdV6nrIrplpHtkQoi3btDoPRT68T2fGiS1vIKmmkB1g3lSaYS7t5ZQd9zU1m8n6eJsyQ10ugx~3gv8ajFwlbCsvtWKIAYphU8IIRwpBukMZpJR32Q4p8hvOSAIYkIjC1JzSBlIWp4541Fyd6sBu-hqhEtZsPeFclD9~ZUeusxvoTTlZDRknoapUSnyqkHJrk85oKuXVLhczfpPIGpWEpFtBzw__" 
-                    alt="Backtest Report" 
-                    className="w-full border border-[#333] shadow-2xl"
-                  />
-                  <div className="mt-8 flex justify-center">
-                    <button 
-                      onClick={advancePipeline}
-                      className="bg-[#00FF41] text-black px-8 py-3 font-bold hover:bg-white transition-colors flex items-center gap-2"
-                    >
-                      DEPLOY LIVE <Zap className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
+      {/* Backtest Validation Section */}
+      <section className="py-24 border-b border-[#333] z-10 relative bg-[#050505]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="order-2 lg:order-1">
+              <img 
+                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/tmVZDPFK8wT8Dg1QHzMwOz-img-1_1770442673000_na1fn_YmFja3Rlc3RfcmVwb3J0X3Yx.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L3RtVlpEUEZLOHdUOERnMVFIek13T3otaW1nLTFfMTc3MDQ0MjY3MzAwMF9uYTFmbl9ZbUZqYTNSbGMzUmZjbVZ3YjNKMFgzWXgucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=MKyhq0QZ5V~gaLTOjqQXi~~CQI3n8eC1LVCBUsJS2D9ZjGFM4qNYUGubRH90ZTfbZodZFZomFuhhIKmKMyjMGgCNU6h1d~-rX2mubr3NhZ2MOrF2O7qJdi6C~hPPhmdV6nrIrplpHtkQoi3btDoPRT68T2fGiS1vIKmmkB1g3lSaYS7t5ZQd9zU1m8n6eJsyQ10ugx~3gv8ajFwlbCsvtWKIAYphU8IIRwpBukMZpJR32Q4p8hvOSAIYkIjC1JzSBlIWp4541Fyd6sBu-hqhEtZsPeFclD9~ZUeusxvoTTlZDRknoapUSnyqkHJrk85oKuXVLhczfpPIGpWEpFtBzw__" 
+                alt="Backtest Report" 
+                className="w-full border border-[#333] shadow-2xl hover:border-[#00FF41] transition-colors duration-500"
+              />
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="inline-flex items-center gap-2 border border-[#333] bg-[#111] px-3 py-1 mb-6">
+                <BarChart2 className="w-4 h-4 text-[#00FF41]" />
+                <span className="text-xs text-gray-400 uppercase tracking-widest">VALIDATION_ENGINE</span>
+              </div>
+              <h2 className="text-4xl font-bold mb-6">REGIME-AWARE BACKTESTING</h2>
+              <p className="text-gray-400 text-lg font-sans mb-8">
+                Don't just test against price. Test against market regimes. Our engine simulates volatility shocks, liquidity crunches, and trend reversals to ensure your bot survives the real world.
+              </p>
+              <ul className="space-y-4 font-mono text-sm text-gray-300">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
+                  <span>Walk-Forward Optimization</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
+                  <span>Monte Carlo Simulations</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
+                  <span>Slippage & Commission Modeling</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
 
-              {/* Step 3: Live Bot */}
-              {pipelineStep === 3 && (
-                <div className="w-full max-w-4xl animate-in fade-in slide-in-from-right duration-500">
-                  <div className="relative">
-                    <div className="absolute -top-4 -left-4 text-xs text-[#00F0FF] font-mono animate-pulse">STATUS: ADAPTIVE_RISK_ACTIVE</div>
-                    <img 
-                      src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/BXlhyLlXFkuLkkOJmGAB0Q-img-2_1770442301000_na1fn_YWRhcHRpdmVfcmlza192MQ.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L0JYbGh5TGxYRmt1TGtrT0ptR0FCMFEtaW1nLTJfMTc3MDQ0MjMwMTAwMF9uYTFmbl9ZV1JoY0hScGRtVmZjbWx6YTE5Mk1RLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=LPmdVICMCL1xVhJwN7o2K5-~kmVeI2K4bOy732mGMQB1W~1fIIaj0Sl5f0i2kMnLaxAB7yRWHKO464Bl-8QrT9Xjjeb6oT~kbxB5d33BwyCa9HeAMylRpBo8LaPSQw38mBC6DaVwIUfg0uSRC5pKb~tySZYtukim~FBjyHKpNIQJAxkaInpit5uO6X-eepOpyAdPk4XvLFkzT59cq8zw6BSTYhRBGWbkl-8ZIaCxvB-WdlCF-yC166cSs2diuBXZD7fd5rta9KJxvv-Eu2VRaySRLv~vD7WuMNlawWjtUcTvXynS5GjGAh18ChEChufwYpJY5vumBKkJyyog~kYstQ__" 
-                      alt="Adaptive Risk Engine" 
-                      className="w-full border border-[#333] shadow-2xl"
-                    />
-                  </div>
-                  <div className="mt-8 flex justify-center">
-                    <button 
-                      onClick={resetPipeline}
-                      className="border border-[#333] text-gray-400 px-8 py-3 font-bold hover:text-white hover:border-white transition-colors flex items-center gap-2"
-                    >
-                      BUILD ANOTHER BOT
-                    </button>
-                  </div>
+      {/* Adaptive Risk Section */}
+      <section className="py-24 border-b border-[#333] z-10 relative bg-[#050505]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 border border-[#333] bg-[#111] px-3 py-1 mb-6">
+                <Shield className="w-4 h-4 text-[#00FF41]" />
+                <span className="text-xs text-gray-400 uppercase tracking-widest">RISK_GUARDRAILS</span>
+              </div>
+              <h2 className="text-4xl font-bold mb-6">ADAPTIVE RISK MANAGEMENT</h2>
+              <p className="text-gray-400 text-lg font-sans mb-8">
+                Your bot watches the market 24/7. When volatility spikes, it tightens stops. When trends confirm, it pyramids positions. It's not just a script; it's an active risk manager.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border border-[#333] p-4 bg-[#0A0A0A]">
+                  <div className="text-[#00FF41] font-bold text-2xl mb-1">0.5s</div>
+                  <div className="text-xs text-gray-500 uppercase">Reaction Time</div>
                 </div>
-              )}
-
-              {/* Loading Overlay */}
-              {isProcessing && (
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-20">
-                  <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-12 h-12 text-[#00FF41] animate-spin" />
-                    <span className="text-[#00FF41] font-mono text-sm animate-pulse">PROCESSING_DATA_STREAM...</span>
-                  </div>
+                <div className="border border-[#333] p-4 bg-[#0A0A0A]">
+                  <div className="text-[#00FF41] font-bold text-2xl mb-1">100%</div>
+                  <div className="text-xs text-gray-500 uppercase">Rule Enforcement</div>
                 </div>
-              )}
+              </div>
+            </div>
+            <div>
+              <img 
+                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/BXlhyLlXFkuLkkOJmGAB0Q-img-2_1770442301000_na1fn_YWRhcHRpdmVfcmlza192MQ.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L0JYbGh5TGxYRmt1TGtrT0ptR0FCMFEtaW1nLTJfMTc3MDQ0MjMwMTAwMF9uYTFmbl9ZV1JoY0hScGRtVmZjbWx6YTE5Mk1RLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=LPmdVICMCL1xVhJwN7o2K5-~kmVeI2K4bOy732mGMQB1W~1fIIaj0Sl5f0i2kMnLaxAB7yRWHKO464Bl-8QrT9Xjjeb6oT~kbxB5d33BwyCa9HeAMylRpBo8LaPSQw38mBC6DaVwIUfg0uSRC5pKb~tySZYtukim~FBjyHKpNIQJAxkaInpit5uO6X-eepOpyAdPk4XvLFkzT59cq8zw6BSTYhRBGWbkl-8ZIaCxvB-WdlCF-yC166cSs2diuBXZD7fd5rta9KJxvv-Eu2VRaySRLv~vD7WuMNlawWjtUcTvXynS5GjGAh18ChEChufwYpJY5vumBKkJyyog~kYstQ__" 
+                alt="Adaptive Risk Engine" 
+                className="w-full border border-[#333] shadow-2xl hover:border-[#00FF41] transition-colors duration-500"
+              />
             </div>
           </div>
         </div>
