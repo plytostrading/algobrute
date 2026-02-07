@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2, AlertTriangle, Eye, Server, ChevronRight, Database, Layers } from 'lucide-react';
+import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2, AlertTriangle, Eye, Server, ChevronRight, Database, Layers, TrendingUp, DollarSign, Sliders } from 'lucide-react';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -10,6 +10,17 @@ export default function Home() {
   const [strategyInput, setStrategyInput] = useState('Buy SPY when RSI < 30 and Price > 200 SMA');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showStrategyCard, setShowStrategyCard] = useState(false);
+  
+  // Risk Simulation State
+  const [volatility, setVolatility] = useState(20); // 0-100
+  const [isDeployed, setIsDeployed] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+
+  // Derived Risk Values
+  const stopLoss = Math.max(0.5, (2.5 - (volatility / 100) * 2)).toFixed(1);
+  const takeProfit = (stopLoss * 2.5).toFixed(1);
+  const riskMode = volatility > 60 ? 'DEFENSIVE' : volatility > 30 ? 'BALANCED' : 'AGGRESSIVE';
+  const riskColor = volatility > 60 ? 'text-red-500' : volatility > 30 ? 'text-yellow-500' : 'text-[#00FF41]';
 
   const handleWaitlistSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +38,14 @@ export default function Home() {
       setIsGenerating(false);
       setShowStrategyCard(true);
     }, 1500);
+  };
+
+  const deployToPaper = () => {
+    setIsDeploying(true);
+    setTimeout(() => {
+      setIsDeploying(false);
+      setIsDeployed(true);
+    }, 2000);
   };
 
   return (
@@ -171,7 +190,7 @@ export default function Home() {
               />
               <button 
                 onClick={generateStrategy}
-                disabled={isGenerating}
+                disabled={isGenerating || showStrategyCard}
                 className="w-full bg-[#00FF41] text-black py-4 font-bold hover:bg-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isGenerating ? (
@@ -188,7 +207,7 @@ export default function Home() {
             </div>
 
             {/* Output Side - Live Strategy Card */}
-            <div className="relative min-h-[400px] flex items-center justify-center bg-[#0A0A0A] border border-[#333] p-8 overflow-hidden">
+            <div className="relative min-h-[500px] flex items-center justify-center bg-[#0A0A0A] border border-[#333] p-8 overflow-hidden">
               {!showStrategyCard ? (
                 <div className="text-center text-gray-600">
                   <Code className="w-16 h-16 mx-auto mb-4 opacity-20" />
@@ -196,93 +215,174 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="animate-in fade-in zoom-in duration-500 w-full max-w-md">
-                  {/* Structured Data Card */}
-                  <div className="bg-[#050505] border border-[#333] shadow-2xl font-mono text-sm relative overflow-hidden group hover:border-[#00FF41] transition-colors">
-                    {/* Card Header */}
-                    <div className="bg-[#111] border-b border-[#333] p-3 flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <Database className="w-4 h-4 text-[#00FF41]" />
-                        <span className="font-bold text-gray-300">STRATEGY_OBJECT</span>
+                  {!isDeployed ? (
+                    /* Static Strategy Card */
+                    <div className="bg-[#050505] border border-[#333] shadow-2xl font-mono text-sm relative overflow-hidden group hover:border-[#00FF41] transition-colors">
+                      {/* Card Header */}
+                      <div className="bg-[#111] border-b border-[#333] p-3 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <Database className="w-4 h-4 text-[#00FF41]" />
+                          <span className="font-bold text-gray-300">STRATEGY_OBJECT</span>
+                        </div>
+                        <span className="text-xs text-gray-600">ID: GEN-8821</span>
                       </div>
-                      <span className="text-xs text-gray-600">ID: GEN-8821</span>
-                    </div>
-                    
-                    {/* Card Body */}
-                    <div className="p-6 space-y-4">
-                      {/* Asset & Direction */}
-                      <div className="grid grid-cols-2 gap-4">
+                      
+                      {/* Card Body */}
+                      <div className="p-6 space-y-4">
+                        {/* Asset & Direction */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-gray-500 text-xs block mb-1">ASSET</span>
+                            <span className="text-[#00FF41] font-bold text-lg">SPY</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs block mb-1">DIRECTION</span>
+                            <span className="text-[#00FF41] font-bold text-lg">LONG</span>
+                          </div>
+                        </div>
+
+                        {/* Entry Rules */}
                         <div>
-                          <span className="text-gray-500 text-xs block mb-1">ASSET</span>
-                          <span className="text-[#00FF41] font-bold text-lg">SPY</span>
+                          <span className="text-gray-500 text-xs block mb-2">ENTRY_RULES</span>
+                          <div className="bg-[#111] border border-[#333] p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
+                              <span className="text-gray-300">RSI(14) &lt; 30</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
+                              <span className="text-gray-300">Price &gt; SMA(200)</span>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Dynamic Risk Engine */}
                         <div>
-                          <span className="text-gray-500 text-xs block mb-1">DIRECTION</span>
-                          <span className="text-[#00FF41] font-bold text-lg">LONG</span>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-gray-500 text-xs">RISK_ENGINE</span>
+                            <div className="flex items-center gap-1.5 bg-[#00FF41]/10 px-2 py-0.5 border border-[#00FF41]/30">
+                              <Activity className="w-3 h-3 text-[#00FF41] animate-pulse" />
+                              <span className="text-[#00FF41] text-[10px] font-bold tracking-wider">LIVE_UPDATING</span>
+                            </div>
+                          </div>
+                          <div className="bg-[#111] border border-[#333] p-3 space-y-2 relative overflow-hidden">
+                            {/* Scan Line Animation */}
+                            <div className="absolute top-0 left-0 w-full h-[1px] bg-[#00FF41]/30 animate-[scan_2s_linear_infinite]"></div>
+                            
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-400 text-xs">STOP_LOSS</span>
+                              <span className={`font-mono text-xs font-bold transition-colors duration-300 ${riskColor}`}>
+                                {stopLoss}% (ATR_SCALED)
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-400 text-xs">TAKE_PROFIT</span>
+                              <span className={`font-mono text-xs font-bold transition-colors duration-300 ${riskColor}`}>
+                                {takeProfit}% (TRAILING)
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-400 text-xs">MODE</span>
+                              <span className={`font-mono text-xs font-bold transition-colors duration-300 ${riskColor}`}>
+                                {riskMode}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Volatility Slider */}
+                        <div className="pt-2">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] text-gray-500 uppercase">Simulate Market Volatility</span>
+                            <span className="text-[10px] text-[#00FF41]">{volatility}%</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            value={volatility} 
+                            onChange={(e) => setVolatility(parseInt(e.target.value))}
+                            className="w-full h-1 bg-[#333] rounded-lg appearance-none cursor-pointer accent-[#00FF41]"
+                          />
                         </div>
                       </div>
 
-                      {/* Entry Rules */}
-                      <div>
-                        <span className="text-gray-500 text-xs block mb-2">ENTRY_RULES</span>
-                        <div className="bg-[#111] border border-[#333] p-3 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
-                            <span className="text-gray-300">RSI(14) &lt; 30</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-[#00FF41]"></div>
-                            <span className="text-gray-300">Price &gt; SMA(200)</span>
-                          </div>
+                      {/* Deploy Button */}
+                      <button 
+                        onClick={deployToPaper}
+                        disabled={isDeploying}
+                        className="w-full bg-[#111] border-t border-[#333] py-3 text-xs font-bold text-gray-300 hover:bg-[#00FF41] hover:text-black transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isDeploying ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            DEPLOYING...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-3 h-3" />
+                            DEPLOY TO PAPER
+                          </>
+                        )}
+                      </button>
+
+                      {/* Decorative Corner */}
+                      <div className="absolute top-0 right-0 w-0 h-0 border-t-[20px] border-r-[20px] border-t-transparent border-r-[#00FF41]/20"></div>
+                    </div>
+                  ) : (
+                    /* Active Bot Dashboard Widget */
+                    <div className="bg-[#050505] border border-[#00FF41] shadow-[0_0_30px_rgba(0,255,65,0.1)] font-mono text-sm relative overflow-hidden animate-in fade-in zoom-in duration-500">
+                      {/* Header */}
+                      <div className="bg-[#00FF41] text-black p-3 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <Server className="w-4 h-4" />
+                          <span className="font-bold">ACTIVE_BOT_01</span>
                         </div>
+                        <span className="text-xs font-bold bg-black/20 px-2 py-0.5 rounded">RUNNING</span>
                       </div>
 
-                      {/* Exit Rules */}
-                      <div>
-                        <span className="text-gray-500 text-xs block mb-2">EXIT_RULES</span>
-                        <div className="bg-[#111] border border-[#333] p-3 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-red-500"></div>
-                            <span className="text-gray-300">RSI(14) &gt; 70</span>
+                      {/* Body */}
+                      <div className="p-6 space-y-6">
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <span className="text-gray-500 text-xs block mb-1">TOTAL P&L</span>
+                            <span className="text-3xl font-bold text-[#00FF41] flex items-center gap-1">
+                              +$1,240.50 <TrendingUp className="w-5 h-5" />
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-red-500"></div>
-                            <span className="text-gray-300">Stop Loss: 2.0%</span>
+                          <div className="text-right">
+                            <span className="text-gray-500 text-xs block mb-1">TODAY</span>
+                            <span className="text-[#00FF41] font-bold">+2.4%</span>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Dynamic Risk Engine */}
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-gray-500 text-xs">RISK_ENGINE</span>
-                          <div className="flex items-center gap-1.5 bg-[#00FF41]/10 px-2 py-0.5 border border-[#00FF41]/30">
-                            <Activity className="w-3 h-3 text-[#00FF41] animate-pulse" />
-                            <span className="text-[#00FF41] text-[10px] font-bold tracking-wider">LIVE_UPDATING</span>
+                        {/* Live Trades */}
+                        <div>
+                          <span className="text-gray-500 text-xs block mb-2">RECENT_ACTIVITY</span>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center text-xs border-b border-[#333] pb-2">
+                              <span className="text-gray-300">Bought SPY @ $412.50</span>
+                              <span className="text-gray-500">10:42 AM</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs border-b border-[#333] pb-2">
+                              <span className="text-gray-300">Stop Loss Adjusted {'->'} $410.20</span>
+                              <span className="text-[#00FF41]">RISK_ENGINE</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-gray-300">Scanning for setup...</span>
+                              <span className="text-yellow-500 animate-pulse">WAITING</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="bg-[#111] border border-[#333] p-3 space-y-2 relative overflow-hidden">
-                          {/* Scan Line Animation */}
-                          <div className="absolute top-0 left-0 w-full h-[1px] bg-[#00FF41]/30 animate-[scan_2s_linear_infinite]"></div>
-                          
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400 text-xs">STOP_LOSS</span>
-                            <span className="text-[#00FF41] font-mono text-xs">DYNAMIC (ATR_SCALED)</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400 text-xs">TAKE_PROFIT</span>
-                            <span className="text-[#00FF41] font-mono text-xs">TRAILING (VOLATILITY)</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400 text-xs">MAX_DRAWDOWN</span>
-                            <span className="text-[#00FF41] font-mono text-xs">AUTO_LIQUIDATE</span>
-                          </div>
+
+                        {/* Action Buttons */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <button className="border border-[#333] py-2 text-xs hover:bg-[#111] transition-colors">VIEW LOGS</button>
+                          <button className="bg-red-500/10 border border-red-500/50 text-red-500 py-2 text-xs hover:bg-red-500 hover:text-white transition-colors">STOP BOT</button>
                         </div>
                       </div>
                     </div>
-
-                    {/* Decorative Corner */}
-                    <div className="absolute top-0 right-0 w-0 h-0 border-t-[20px] border-r-[20px] border-t-transparent border-r-[#00FF41]/20"></div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
