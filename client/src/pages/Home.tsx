@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2 } from 'lucide-react';
+import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2, AlertTriangle, Eye, Server } from 'lucide-react';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -40,13 +40,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-mono selection:bg-[#00FF41] selection:text-black">
+    <div className="min-h-screen bg-[#050505] text-white font-mono selection:bg-[#00FF41] selection:text-black relative overflow-x-hidden">
+      {/* Background Texture */}
+      <div className="fixed inset-0 z-0 opacity-30 pointer-events-none">
+        <img 
+          src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/0LtwFffZQmWF6fBhqsuSm5-img-2_1770441977000_na1fn_ZGF0YV9zdHJlYW1fYmc.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94LzBMdHdGZmZaUW1XRjZmQmhxc3VTbTUtaW1nLTJfMTc3MDQ0MTk3NzAwMF9uYTFmbl9aR0YwWVY5emRISmxZVzFmWW1jLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=spYtVgE1WSz7l31wLbYMMUlf~mWnd0c310snXM4oEs6wYWhKlSAk5zgqVThQxdcf~GYihrcUOEPtJK~ExilQIHpEYj4oAYb7G5FLVkffgHGYJx~UAWniacBp4Wf8DUOicEu5oagGTICKb5jd5eZm2LoJTtDgCZjIKaiR-sssEEcWAvY342JoyaGhlAqZnEQHapJ~0sPH2NN33aVP97MTvsuy0lUEzGgKQFveCATafbKVQaeOw7BcYdqfkcjAEK1t3kFP1DGB9hVjWuE76fJW6nJYFnpSsM56nA~hCnjNmYEYMJNwcdy4gN-3EeK4s-AhAkwazfVElTCGUvP6GZOf5A__" 
+          alt="" 
+          className="w-full h-full object-cover"
+        />
+      </div>
+
       {/* Navigation */}
       <nav className="fixed w-full z-50 border-b border-[#333] bg-[#050505]/90 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#00FF41]"></div>
+              <div className="w-3 h-3 bg-[#00FF41] animate-pulse"></div>
               <span className="text-xl font-bold tracking-tighter">ALGOBRUTE</span>
             </div>
             <div className="hidden md:block">
@@ -64,12 +73,8 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-20">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1a1a1a_1px,transparent_1px),linear-gradient(to_bottom,#1a1a1a_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
-        </div>
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <div className="inline-flex items-center gap-2 border border-[#333] bg-[#111] px-3 py-1 mb-8">
@@ -139,8 +144,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Ticker */}
-      <div className="border-y border-[#333] bg-[#0A0A0A] overflow-hidden py-4">
+      {/* System Status Divider */}
+      <div className="border-y border-[#333] bg-[#0A0A0A] overflow-hidden py-4 z-10 relative">
         <div className="flex gap-12 animate-marquee whitespace-nowrap text-sm text-gray-400 font-mono">
           <span>BTC/USD <span className="text-[#00FF41]">$45,230.50</span></span>
           <span>ETH/USD <span className="text-red-500">$3,210.00</span></span>
@@ -152,8 +157,16 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Narrative Thread: The Scan */}
+      <div className="py-8 bg-[#050505] border-b border-[#333] flex justify-center z-10 relative">
+        <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
+          <Eye className="w-4 h-4 text-[#00FF41] animate-pulse" />
+          <span>SCANNING MARKET REGIMES...</span>
+        </div>
+      </div>
+
       {/* Story 1: Idea to Execution (Interactive Widget) */}
-      <section id="features" className="py-24 border-b border-[#333]">
+      <section id="features" className="py-24 border-b border-[#333] z-10 relative bg-[#050505]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center mb-24">
             <div>
@@ -240,16 +253,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Story 2: Sleep at Night */}
-      <section className="py-24 bg-[#080808]">
+      {/* Narrative Thread: The Logic */}
+      <div className="py-8 bg-[#050505] border-b border-[#333] flex justify-center z-10 relative">
+        <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
+          <Server className="w-4 h-4 text-[#00F0FF] animate-pulse" />
+          <span>VALIDATING RISK PARAMETERS...</span>
+        </div>
+      </div>
+
+      {/* Story 2: Sleep at Night (Updated Visuals) */}
+      <section className="py-24 bg-[#080808] z-10 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="order-2 lg:order-1">
-              <img 
-                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/FNo529hNiiEV1Hu0kNj2kt-img-3_1770440330000_na1fn_ZmVhdHVyZV9yaXNr.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L0ZObzUyOWhOaWlFVjFIdTBrTmoya3QtaW1nLTNfMTc3MDQ0MDMzMDAwMF9uYTFmbl9abVZoZEhWeVpWOXlhWE5yLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=CvkUcNFSevY1JUqM5veOYX5XzDLzYVjrscDmgJevYcnZUysU~LDZjKHNNtudT2W72kitGqqEZXEH6uK-KXBkDTYIfEV1PSX-F9PvjhLkrXdYVlHN4e578ySjN0D7FL9R9wzzTFbfFMPdlCmW-~~eVvX5I74F33VI1IHFPv0oB3ew6vikfkyDghvEXosQOTVMqwyL5-7MtLx~J6CbEkhsx3fZ-emFCVWI4Wwo6s53OgmsJ36m8HEzl9udJrYBb-PCYWQ6iDe6pjLD5A1KPWZ2IoMNSNip8wLtJTTObchj9gh4iHuVYI2vGQCRBQyYOG98UKqs3J2SISfu56RwzbFwbQ__" 
-                alt="Risk Management Shield" 
-                className="w-full border border-[#333] grayscale hover:grayscale-0 transition-all duration-500"
-              />
+              <div className="relative">
+                <div className="absolute -top-4 -left-4 text-xs text-red-500 font-mono animate-pulse">ALERT: TRADE_REJECTED</div>
+                <img 
+                  src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/0LtwFffZQmWF6fBhqsuSm5-img-1_1770441973000_na1fn_cmlza19sb2dpY192MQ.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94LzBMdHdGZmZaUW1XRjZmQmhxc3VTbTUtaW1nLTFfMTc3MDQ0MTk3MzAwMF9uYTFmbl9jbWx6YTE5c2IyZHBZMTkyTVEucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=mtsIlRRA3oE2A66i~3Qs0lbTogmdJp3EUNvgUxBLG2z~nq~uigS-FKi5Y9LqAiCE3kWp58er09ktVbkTcNet5WpX2MnE12tGd3FPGzdrxr2LLmgxUD~6sKbjCJJ7DtUVG6LhSnTahIPhOmYCXxVM-8W7QH6UwpKKEloLlhLWzfJZQjUMHN7rIlaoMru6DZwr-j8mNAFgpmsG4uTEj8F42oKu1tfZo7gEQqd0MZc8zooMI7wiSaiOaLVQG8dCjxMaHVr~HMXyFuCk5Xn4EnOL002i7J8HnEO4e64yuFap74x6FZvmREfZDNwPPlfwTL14MmHK56RJkRMn~XF5TlGvkQ__" 
+                  alt="Risk Logic Visualization" 
+                  className="w-full border border-[#333] hover:border-red-500 transition-colors duration-500"
+                />
+              </div>
             </div>
             <div className="order-1 lg:order-2">
               <div className="mb-6 text-[#00F0FF]">
@@ -281,56 +305,93 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Comparison Table */}
-      <section className="py-24 border-t border-[#333] bg-[#0A0A0A]">
+      {/* Narrative Thread: The Comparison */}
+      <div className="py-8 bg-[#050505] border-b border-[#333] flex justify-center z-10 relative">
+        <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
+          <Activity className="w-4 h-4 text-yellow-500 animate-pulse" />
+          <span>BENCHMARKING PERFORMANCE...</span>
+        </div>
+      </div>
+
+      {/* Feature Matrix (Revamped Comparison) */}
+      <section className="py-24 border-t border-[#333] bg-[#0A0A0A] z-10 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">WHY ALGOBRUTE?</h2>
+            <h2 className="text-3xl font-bold mb-4">TECHNICAL SPECIFICATIONS</h2>
             <p className="text-gray-400 max-w-2xl mx-auto font-sans">
-              See how we stack up against the competition.
+              System capabilities vs. legacy platforms.
             </p>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse font-mono text-sm">
               <thead>
                 <tr className="border-b border-[#333]">
-                  <th className="p-4 text-gray-500 font-normal text-sm">FEATURE</th>
-                  <th className="p-4 text-[#00FF41] font-bold text-lg bg-[#111] border-x border-[#333] w-1/4">ALGOBRUTE</th>
-                  <th className="p-4 text-gray-400 font-bold w-1/4">TRADINGVIEW</th>
-                  <th className="p-4 text-gray-400 font-bold w-1/4">COMPOSER</th>
+                  <th className="p-4 text-gray-500 font-normal w-1/3">CAPABILITY</th>
+                  <th className="p-4 text-[#00FF41] font-bold bg-[#111] border-x border-[#333] w-1/4 text-center">ALGOBRUTE v2.4</th>
+                  <th className="p-4 text-gray-500 font-bold w-1/4 text-center">TRADINGVIEW</th>
+                  <th className="p-4 text-gray-500 font-bold w-1/4 text-center">COMPOSER</th>
                 </tr>
               </thead>
-              <tbody className="font-sans text-sm">
-                <tr className="border-b border-[#333]">
-                  <td className="p-4 font-mono text-gray-300">Strategy Creation</td>
-                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Plain English (LLM)</td>
-                  <td className="p-4 text-gray-500">PineScript Code</td>
-                  <td className="p-4 text-gray-500">Visual Blocks</td>
+              <tbody>
+                <tr className="border-b border-[#333] hover:bg-[#111]/50 transition-colors">
+                  <td className="p-4 text-gray-300">
+                    <div className="font-bold text-white">Strategy Generation</div>
+                    <div className="text-xs text-gray-500 mt-1">Method of input</div>
+                  </td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-center">
+                    <span className="text-[#00FF41] font-bold">LLM / Natural Language</span>
+                  </td>
+                  <td className="p-4 text-center text-gray-500">PineScript (Manual)</td>
+                  <td className="p-4 text-center text-gray-500">Visual Blocks</td>
                 </tr>
-                <tr className="border-b border-[#333]">
-                  <td className="p-4 font-mono text-gray-300">Backtesting Engine</td>
-                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Regime-Aware (Robust)</td>
-                  <td className="p-4 text-gray-500">Basic (Prone to Overfitting)</td>
-                  <td className="p-4 text-gray-500">Standard</td>
+                <tr className="border-b border-[#333] hover:bg-[#111]/50 transition-colors">
+                  <td className="p-4 text-gray-300">
+                    <div className="font-bold text-white">Backtest Fidelity</div>
+                    <div className="text-xs text-gray-500 mt-1">Accuracy of simulation</div>
+                  </td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-center">
+                    <span className="text-[#00FF41] font-bold">Regime-Aware</span>
+                  </td>
+                  <td className="p-4 text-center text-gray-500">Bar-by-Bar (Basic)</td>
+                  <td className="p-4 text-center text-gray-500">Standard</td>
                 </tr>
-                <tr className="border-b border-[#333]">
-                  <td className="p-4 font-mono text-gray-300">Risk Guardrails</td>
-                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Hard-Coded Limits</td>
-                  <td className="p-4 text-gray-500">Manual Alerts</td>
-                  <td className="p-4 text-gray-500">Basic</td>
+                <tr className="border-b border-[#333] hover:bg-[#111]/50 transition-colors">
+                  <td className="p-4 text-gray-300">
+                    <div className="font-bold text-white">Risk Enforcement</div>
+                    <div className="text-xs text-gray-500 mt-1">Hard-coded guardrails</div>
+                  </td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-center">
+                    <Check className="w-5 h-5 text-[#00FF41] mx-auto" />
+                  </td>
+                  <td className="p-4 text-center text-gray-500">
+                    <X className="w-5 h-5 text-red-900 mx-auto" />
+                  </td>
+                  <td className="p-4 text-center text-gray-500">
+                    <AlertTriangle className="w-5 h-5 text-yellow-900 mx-auto" />
+                  </td>
                 </tr>
-                <tr className="border-b border-[#333]">
-                  <td className="p-4 font-mono text-gray-300">Transparency</td>
-                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Glass Box (Full Logic)</td>
-                  <td className="p-4 text-gray-500">Code View</td>
-                  <td className="p-4 text-gray-500">Black Box</td>
+                <tr className="border-b border-[#333] hover:bg-[#111]/50 transition-colors">
+                  <td className="p-4 text-gray-300">
+                    <div className="font-bold text-white">Execution Latency</div>
+                    <div className="text-xs text-gray-500 mt-1">Avg. time to fill</div>
+                  </td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-center">
+                    <span className="text-[#00FF41] font-bold">~14ms</span>
+                  </td>
+                  <td className="p-4 text-center text-gray-500">Variable (Webhook)</td>
+                  <td className="p-4 text-center text-gray-500">~500ms</td>
                 </tr>
                 <tr>
-                  <td className="p-4 font-mono text-gray-300">Pricing</td>
-                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Flat Monthly Fee</td>
-                  <td className="p-4 text-gray-500">Tiered + Data Fees</td>
-                  <td className="p-4 text-gray-500">AUM Fees / Monthly</td>
+                  <td className="p-4 text-gray-300">
+                    <div className="font-bold text-white">Pricing Model</div>
+                    <div className="text-xs text-gray-500 mt-1">Cost structure</div>
+                  </td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-center">
+                    <span className="text-white font-bold">Flat Monthly</span>
+                  </td>
+                  <td className="p-4 text-center text-gray-500">Tiered + Data Fees</td>
+                  <td className="p-4 text-center text-gray-500">AUM % Fee</td>
                 </tr>
               </tbody>
             </table>
@@ -339,7 +400,7 @@ export default function Home() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 border-t border-[#333]">
+      <section id="pricing" className="py-24 border-t border-[#333] z-10 relative bg-[#050505]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">SIMPLE PRICING</h2>
@@ -350,7 +411,7 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Tier 1 */}
-            <div className="border border-[#333] bg-[#0A0A0A] p-8 flex flex-col">
+            <div className="border border-[#333] bg-[#0A0A0A] p-8 flex flex-col hover:border-gray-500 transition-colors">
               <div className="mb-4">
                 <h3 className="text-xl font-bold">STARTER</h3>
                 <div className="text-3xl font-bold mt-2">$29<span className="text-sm text-gray-500 font-normal">/mo</span></div>
@@ -368,7 +429,7 @@ export default function Home() {
             </div>
 
             {/* Tier 2 */}
-            <div className="border border-[#00FF41] bg-[#0A0A0A] p-8 flex flex-col relative transform md:-translate-y-4">
+            <div className="border border-[#00FF41] bg-[#0A0A0A] p-8 flex flex-col relative transform md:-translate-y-4 shadow-[0_0_30px_rgba(0,255,65,0.1)]">
               <div className="absolute top-0 left-0 w-full h-1 bg-[#00FF41]"></div>
               <div className="absolute top-4 right-4 text-[10px] bg-[#00FF41] text-black px-2 py-1 font-bold">MOST POPULAR</div>
               <div className="mb-4">
@@ -392,7 +453,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[#333] bg-[#050505] py-12">
+      <footer className="border-t border-[#333] bg-[#050505] py-12 z-10 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div className="col-span-2">
