@@ -251,12 +251,31 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Risk Model */}
-                      <div className="pt-4 border-t border-[#333] flex justify-between items-center">
-                        <span className="text-gray-500 text-xs">RISK_MODEL</span>
-                        <div className="flex items-center gap-2 text-[#00FF41]">
-                          <Shield className="w-3 h-3" />
-                          <span className="font-bold text-xs">ADAPTIVE_VOLATILITY</span>
+                      {/* Dynamic Risk Engine */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-gray-500 text-xs">RISK_ENGINE</span>
+                          <div className="flex items-center gap-1.5 bg-[#00FF41]/10 px-2 py-0.5 border border-[#00FF41]/30">
+                            <Activity className="w-3 h-3 text-[#00FF41] animate-pulse" />
+                            <span className="text-[#00FF41] text-[10px] font-bold tracking-wider">LIVE_UPDATING</span>
+                          </div>
+                        </div>
+                        <div className="bg-[#111] border border-[#333] p-3 space-y-2 relative overflow-hidden">
+                          {/* Scan Line Animation */}
+                          <div className="absolute top-0 left-0 w-full h-[1px] bg-[#00FF41]/30 animate-[scan_2s_linear_infinite]"></div>
+                          
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-xs">STOP_LOSS</span>
+                            <span className="text-[#00FF41] font-mono text-xs">DYNAMIC (ATR_SCALED)</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-xs">TAKE_PROFIT</span>
+                            <span className="text-[#00FF41] font-mono text-xs">TRAILING (VOLATILITY)</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-xs">MAX_DRAWDOWN</span>
+                            <span className="text-[#00FF41] font-mono text-xs">AUTO_LIQUIDATE</span>
+                          </div>
                         </div>
                       </div>
                     </div>
