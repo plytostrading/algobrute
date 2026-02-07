@@ -1,7 +1,44 @@
-import React from 'react';
-import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Terminal, Shield, Cpu, Activity, ArrowRight, Code, BarChart2, Lock, Zap, Moon, Check, X, Play, Loader2 } from 'lucide-react';
 
 export default function Home() {
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  
+  const [strategyInput, setStrategyInput] = useState('Buy SPY when RSI < 30');
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [compiledStrategy, setCompiledStrategy] = useState<null | {
+    condition: string;
+    action: string;
+    risk: string;
+  }>(null);
+
+  const handleWaitlistSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    // Simulate API call
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setIsSubmitted(true);
+      setEmail('');
+    }, 1500);
+  };
+
+  const handleCompile = () => {
+    setIsCompiling(true);
+    setCompiledStrategy(null);
+    // Simulate compilation
+    setTimeout(() => {
+      setIsCompiling(false);
+      setCompiledStrategy({
+        condition: "IF (RSI_14 < 30) AND (PRICE > SMA_200)",
+        action: "BUY MARKET (ALLOCATION: 5%)",
+        risk: "STOP_LOSS: -2.5% | TAKE_PROFIT: +5.0%"
+      });
+    }, 2000);
+  };
+
   return (
     <div className="min-h-screen bg-[#050505] text-white font-mono selection:bg-[#00FF41] selection:text-black">
       {/* Navigation */}
@@ -46,14 +83,34 @@ export default function Home() {
               <p className="text-xl text-gray-400 mb-8 max-w-lg font-sans">
                 Turn your trading ideas into automated bots without writing a single line of code. We handle the execution, risk management, and infrastructure. You handle the alpha.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button className="bg-[#00FF41] text-black px-8 py-4 font-bold uppercase tracking-wider hover:bg-white transition-colors flex items-center justify-center gap-2 group">
-                  Start Building Free
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-                <button className="border border-[#333] text-gray-300 px-8 py-4 font-bold uppercase tracking-wider hover:border-white hover:text-white transition-colors">
-                  See How It Works
-                </button>
+              
+              {/* Waitlist Form */}
+              <div className="max-w-md mb-8">
+                {!isSubmitted ? (
+                  <form onSubmit={handleWaitlistSubmit} className="flex gap-2">
+                    <input 
+                      type="email" 
+                      required
+                      placeholder="Enter your email for early access"
+                      className="flex-1 bg-[#0A0A0A] border border-[#333] px-4 py-3 text-sm focus:outline-none focus:border-[#00FF41] transition-colors"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="bg-[#00FF41] text-black px-6 py-3 font-bold uppercase tracking-wider hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Join Waitlist'}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="bg-[#00FF41]/10 border border-[#00FF41] p-4 flex items-center gap-3 text-[#00FF41]">
+                    <Check className="w-5 h-5" />
+                    <span className="font-bold text-sm">ACCESS REQUESTED. WE WILL CONTACT YOU SHORTLY.</span>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-2 font-sans">Limited spots available for the beta program.</p>
               </div>
             </div>
             <div className="relative">
@@ -95,7 +152,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Story 1: Idea to Execution */}
+      {/* Story 1: Idea to Execution (Interactive Widget) */}
       <section id="features" className="py-24 border-b border-[#333]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center mb-24">
@@ -107,19 +164,77 @@ export default function Home() {
               <p className="text-gray-400 text-lg mb-6 font-sans">
                 You don't need to be a Python wizard to build a bot. Just describe your strategy in plain English.
               </p>
-              <div className="bg-[#111] border border-[#333] p-6 mb-6 font-mono text-sm text-gray-300">
-                <span className="text-[#00FF41]">{">"}</span> "Buy SPY when RSI is below 30 and price is above the 200-day moving average. Sell when RSI hits 70."
+              
+              {/* Interactive Widget */}
+              <div className="bg-[#111] border border-[#333] p-6 mb-6">
+                <div className="flex items-center gap-2 mb-4 text-xs text-gray-500 uppercase tracking-widest">
+                  <Terminal className="w-3 h-3" />
+                  Strategy Input
+                </div>
+                <div className="relative">
+                  <textarea 
+                    className="w-full bg-[#050505] border border-[#333] p-4 text-sm text-gray-300 font-mono focus:outline-none focus:border-[#00FF41] transition-colors resize-none h-24"
+                    value={strategyInput}
+                    onChange={(e) => setStrategyInput(e.target.value)}
+                  />
+                  <button 
+                    onClick={handleCompile}
+                    disabled={isCompiling}
+                    className="absolute bottom-4 right-4 bg-[#00FF41] text-black p-2 hover:bg-white transition-colors disabled:opacity-50"
+                  >
+                    {isCompiling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
+
               <p className="text-gray-400 font-sans">
                 AlgoBrute's engine instantly converts your words into a rigorous, backtestable strategy code. Test 10 ideas in the time it used to take to code one.
               </p>
             </div>
+            
+            {/* Widget Output / Image */}
             <div className="relative">
-               <img 
-                src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/FNo529hNiiEV1Hu0kNj2kt-img-4_1770440333000_na1fn_ZmVhdHVyZV9hdXRvbWF0aW9u.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L0ZObzUyOWhOaWlFVjFIdTBrTmoya3QtaW1nLTRfMTc3MDQ0MDMzMzAwMF9uYTFmbl9abVZoZEhWeVpWOWhkWFJ2YldGMGFXOXUucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=WPAw1~-p-m74Badri6ErD7B2ZSOowYoaxhjyWK4lay-4yXweMaAKNSfG5z20bks9b-hhuAh8FT86nP0fzt0jECXbNbKTdChjeN95iJBb9MiagHk8JQnwyBgViIkyOMUxh6zNd4nSgqzYM7lKMmkRh~De4fMLpcKcWGjfZAaAs-gMtY56sYqR7zJnDqkdvFeTyU-09McWyDll1zHwDQz9~L7c0vCbHhUOUavRBo7hbfH8L1iySLYzZrnp6WjhRx8-fQJmcxeyioA98P~l4AoaFkyS6ZI0ay-bksaLG~l1O3uuJz4~tmN5sT7Qe85DsoD87efQOrQQpIRLdSi1RujtMg__" 
-                alt="Automation Visualization" 
-                className="w-full border border-[#333] grayscale hover:grayscale-0 transition-all duration-500"
-              />
+              {compiledStrategy ? (
+                <div className="border border-[#00FF41] bg-[#0A0A0A] p-6 animate-in fade-in zoom-in duration-300">
+                  <div className="flex items-center justify-between mb-6 border-b border-[#333] pb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-[#00FF41] animate-pulse"></div>
+                      <span className="font-bold text-[#00FF41]">STRATEGY_COMPILED</span>
+                    </div>
+                    <span className="text-xs text-gray-500">ID: 8X-294</span>
+                  </div>
+                  <div className="space-y-4 font-mono text-sm">
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-1">ENTRY_CONDITION</span>
+                      <div className="bg-[#111] p-3 border-l-2 border-[#00FF41] text-white">
+                        {compiledStrategy.condition}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-1">EXECUTION_LOGIC</span>
+                      <div className="bg-[#111] p-3 border-l-2 border-[#00F0FF] text-white">
+                        {compiledStrategy.action}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-1">RISK_GUARDRAILS</span>
+                      <div className="bg-[#111] p-3 border-l-2 border-red-500 text-white">
+                        {compiledStrategy.risk}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-[#333] flex justify-between items-center">
+                    <span className="text-xs text-gray-500">READY FOR BACKTEST</span>
+                    <button className="text-[#00FF41] text-xs font-bold hover:underline">DEPLOY TO PAPER &rarr;</button>
+                  </div>
+                </div>
+              ) : (
+                 <img 
+                  src="https://private-us-east-1.manuscdn.com/sessionFile/HqyEPK95aD98F100rJ2V7T/sandbox/Qg7Yyx5VQXs7Jyj3oeyyZy-img-1_1770441548000_na1fn_ZW5nbGlzaF90b19jb2RlX3Yy.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSHF5RVBLOTVhRDk4RjEwMHJKMlY3VC9zYW5kYm94L1FnN1l5eDVWUVhzN0p5ajNvZXl5WnktaW1nLTFfMTc3MDQ0MTU0ODAwMF9uYTFmbl9aVzVuYkdsemFGOTBiMTlqYjJSbFgzWXkucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=J~GKkaiadmhyaf7JMitei1Y0VM~Z-3hCFwoRHwxjYBQ-TdhSVqBUH5aniDD05XPsFJS3kF7dIn06GtrQgx6QgJdAXMfRWfgYI9jK3stSnzd-DF~uH3xBwLtnv9HH-2yiHeIy2ikxxPNU8keST8jd6xrJ7JCWQVIA4BYyy-dnJZ5NuGDnq7-oM68qd-n2vLuSYeNzoHd76BrYYzjR46zFDvjI5xKDPJOXSZGDGbMab0YknHragBe2VlJfXfUobBI1OdzUpMr8p4g3lEUF4oYxgE2l4uDy1nTgQAlU1JER7MUePbbFQkVwTtCzVey-ufePqg2A7Ht83qOTAwp3WuEytg__" 
+                  alt="English to Code Visualization" 
+                  className="w-full border border-[#333] grayscale hover:grayscale-0 transition-all duration-500"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -140,7 +255,7 @@ export default function Home() {
               <div className="mb-6 text-[#00F0FF]">
                 <Moon className="w-12 h-12" />
               </div>
-              <h2 className="text-3xl font-bold mb-6">THE "SLEEP AT NIGHT" <br/>GUARANTEE</h2>
+              <h2 className="text-3xl font-bold mb-6">TRADE WITH <br/>CONFIDENCE</h2>
               <p className="text-gray-400 text-lg mb-6 font-sans">
                 The biggest risk to your portfolio isn't the market. It's you.
               </p>
@@ -166,6 +281,63 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Comparison Table */}
+      <section className="py-24 border-t border-[#333] bg-[#0A0A0A]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4">WHY ALGOBRUTE?</h2>
+            <p className="text-gray-400 max-w-2xl mx-auto font-sans">
+              See how we stack up against the competition.
+            </p>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#333]">
+                  <th className="p-4 text-gray-500 font-normal text-sm">FEATURE</th>
+                  <th className="p-4 text-[#00FF41] font-bold text-lg bg-[#111] border-x border-[#333] w-1/4">ALGOBRUTE</th>
+                  <th className="p-4 text-gray-400 font-bold w-1/4">TRADINGVIEW</th>
+                  <th className="p-4 text-gray-400 font-bold w-1/4">COMPOSER</th>
+                </tr>
+              </thead>
+              <tbody className="font-sans text-sm">
+                <tr className="border-b border-[#333]">
+                  <td className="p-4 font-mono text-gray-300">Strategy Creation</td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Plain English (LLM)</td>
+                  <td className="p-4 text-gray-500">PineScript Code</td>
+                  <td className="p-4 text-gray-500">Visual Blocks</td>
+                </tr>
+                <tr className="border-b border-[#333]">
+                  <td className="p-4 font-mono text-gray-300">Backtesting Engine</td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Regime-Aware (Robust)</td>
+                  <td className="p-4 text-gray-500">Basic (Prone to Overfitting)</td>
+                  <td className="p-4 text-gray-500">Standard</td>
+                </tr>
+                <tr className="border-b border-[#333]">
+                  <td className="p-4 font-mono text-gray-300">Risk Guardrails</td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Hard-Coded Limits</td>
+                  <td className="p-4 text-gray-500">Manual Alerts</td>
+                  <td className="p-4 text-gray-500">Basic</td>
+                </tr>
+                <tr className="border-b border-[#333]">
+                  <td className="p-4 font-mono text-gray-300">Transparency</td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Glass Box (Full Logic)</td>
+                  <td className="p-4 text-gray-500">Code View</td>
+                  <td className="p-4 text-gray-500">Black Box</td>
+                </tr>
+                <tr>
+                  <td className="p-4 font-mono text-gray-300">Pricing</td>
+                  <td className="p-4 bg-[#111] border-x border-[#333] text-white font-bold">Flat Monthly Fee</td>
+                  <td className="p-4 text-gray-500">Tiered + Data Fees</td>
+                  <td className="p-4 text-gray-500">AUM Fees / Monthly</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="pricing" className="py-24 border-t border-[#333]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -182,13 +354,13 @@ export default function Home() {
               <div className="mb-4">
                 <h3 className="text-xl font-bold">STARTER</h3>
                 <div className="text-3xl font-bold mt-2">$29<span className="text-sm text-gray-500 font-normal">/mo</span></div>
-                <p className="text-xs text-gray-500 mt-2 font-sans">Perfect for testing and validation.</p>
+                <p className="text-xs text-gray-500 mt-2 font-sans">Best for: Validating ideas without risking capital.</p>
               </div>
               <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-400 font-sans">
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Unlimited Backtesting</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> 5 Active "Paper" Bots</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> End-of-Day Data</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Basic Risk Guardrails</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> <strong>Unlimited Backtesting</strong> on EOD Data</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> <strong>5 Active "Paper" Bots</strong> to test live</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> <strong>Standard LLM Access</strong> for strategy gen</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> Basic Risk Guardrails</li>
               </ul>
               <button className="w-full border border-[#333] py-3 hover:bg-white hover:text-black transition-colors uppercase font-bold text-sm">
                 Start Free Trial
@@ -202,14 +374,14 @@ export default function Home() {
               <div className="mb-4">
                 <h3 className="text-xl font-bold text-[#00FF41]">PRO</h3>
                 <div className="text-3xl font-bold mt-2">$79<span className="text-sm text-gray-500 font-normal">/mo</span></div>
-                <p className="text-xs text-gray-400 mt-2 font-sans">For traders ready to automate live.</p>
+                <p className="text-xs text-gray-400 mt-2 font-sans">Best for: Automating live trades with real money.</p>
               </div>
               <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-300 font-sans">
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Real-time Data (Polygon.io)</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Unlimited Active Bots</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Live Broker Execution</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Advanced Regime Detection</li>
-                <li className="flex items-center gap-2"><Code className="w-4 h-4 text-[#00FF41]" /> Priority LLM Access</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> <strong>Real-time Data</strong> (Polygon.io included)</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> <strong>Unlimited Active Bots</strong></li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> <strong>Live Broker Execution</strong> (Alpaca/IBKR)</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> <strong>Advanced Regime Detection</strong></li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00FF41]" /> Priority LLM Access</li>
               </ul>
               <button className="w-full bg-[#00FF41] text-black py-3 hover:bg-white transition-colors uppercase font-bold text-sm">
                 Get Started
