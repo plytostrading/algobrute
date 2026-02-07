@@ -36,11 +36,27 @@ export default function Home() {
     const sharpe = (marketRegime === 'BULL_2021' ? 2.4 : marketRegime === 'BEAR_2022' ? 1.1 : 0.4) - (slippage * 0.002);
     const drawdown = marketRegime === 'CRASH_2020' ? 28.5 : marketRegime === 'BEAR_2022' ? 15.2 : 8.4;
     
+    // New Metrics
+    const sortino = (parseFloat(sharpe.toFixed(2)) * 1.5).toFixed(2);
+    const profitFactor = (marketRegime === 'BULL_2021' ? 2.1 : 1.3) - (slippage * 0.001);
+    const cagr = (parseFloat(finalReturn) * 0.8).toFixed(1); // Simplified annualization
+    const avgWin = (marketRegime === 'BULL_2021' ? 450 : 220).toFixed(0);
+    const avgLoss = (marketRegime === 'CRASH_2020' ? -350 : -180).toFixed(0);
+    const trades = marketRegime === 'BULL_2021' ? 142 : 89;
+    const sqn = (parseFloat(sharpe.toFixed(2)) * 3.2).toFixed(1); // System Quality Number approximation
+
     return {
       return: finalReturn,
       sharpe: sharpe.toFixed(2),
       drawdown: drawdown.toFixed(1),
-      winRate: marketRegime === 'BULL_2021' ? 68 : 54
+      winRate: marketRegime === 'BULL_2021' ? 68 : 54,
+      sortino,
+      profitFactor: profitFactor.toFixed(2),
+      cagr,
+      avgWin,
+      avgLoss,
+      trades,
+      sqn
     };
   };
 
@@ -492,51 +508,86 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="grid lg:grid-cols-3 gap-1 p-8">
+            <div className="flex flex-col gap-1 p-8">
               {/* Chart Area */}
-              <div className="lg:col-span-2 h-64 relative border border-[#333] bg-[#050505] p-4 flex items-end">
+              <div className="h-80 relative border border-[#333] bg-[#050505] p-4 flex items-end w-full">
                 {/* Simulated Chart Lines */}
-                <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 300" preserveAspectRatio="none">
                   {/* Grid Lines */}
-                  <line x1="0" y1="25%" x2="100%" y2="25%" stroke="#333" strokeDasharray="4" />
-                  <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#333" strokeDasharray="4" />
-                  <line x1="0" y1="75%" x2="100%" y2="75%" stroke="#333" strokeDasharray="4" />
+                  <line x1="0" y1="75" x2="1000" y2="75" stroke="#222" strokeWidth="1" />
+                  <line x1="0" y1="150" x2="1000" y2="150" stroke="#222" strokeWidth="1" />
+                  <line x1="0" y1="225" x2="1000" y2="225" stroke="#222" strokeWidth="1" />
                   
-                  {/* Monte Carlo Paths (Faint) */}
-                  <path d={`M0,100 Q50,${100 - metrics.winRate} 100,${marketRegime === 'CRASH_2020' ? 150 : 50}`} fill="none" stroke="#333" strokeWidth="1" className="opacity-30" />
-                  <path d={`M0,100 Q50,${110 - metrics.winRate} 100,${marketRegime === 'CRASH_2020' ? 140 : 60}`} fill="none" stroke="#333" strokeWidth="1" className="opacity-30" />
-                  
+                  {/* Monte Carlo Paths (Faint Background Noise) */}
+                  <path d={marketRegime === 'CRASH_2020' 
+                    ? "M0,150 L100,140 L200,160 L300,200 L400,240 L500,230 L600,250 L700,260 L800,250 L900,270 L1000,280" 
+                    : "M0,250 L100,240 L200,230 L300,210 L400,200 L500,180 L600,160 L700,140 L800,120 L900,100 L1000,80"} 
+                    fill="none" stroke="#333" strokeWidth="1" className="opacity-20" />
+                  <path d={marketRegime === 'CRASH_2020' 
+                    ? "M0,150 L100,160 L200,180 L300,220 L400,260 L500,250 L600,270 L700,280 L800,270 L900,290 L1000,300" 
+                    : "M0,250 L100,260 L200,240 L300,220 L400,210 L500,190 L600,170 L700,150 L800,130 L900,110 L1000,90"} 
+                    fill="none" stroke="#333" strokeWidth="1" className="opacity-20" />
+
                   {/* Main Equity Curve */}
                   <path 
-                    d={`M0,100 C30,${100 - (parseFloat(metrics.return) * 0.5)} 70,${100 - (parseFloat(metrics.return) * 1.2)} 100,${100 - (parseFloat(metrics.return) * 2)}`} 
+                    d={marketRegime === 'BULL_2021' 
+                      ? "M0,250 C200,240 300,200 500,150 S800,50 1000,20" 
+                      : marketRegime === 'BEAR_2022' 
+                      ? "M0,250 C200,260 400,240 600,200 S800,180 1000,150" 
+                      : "M0,150 C200,160 300,250 500,280 S800,290 1000,300"}
                     fill="none" 
                     stroke={parseFloat(metrics.return) > 0 ? "#00FF41" : "#EF4444"} 
-                    strokeWidth="2" 
-                    className="drop-shadow-[0_0_10px_rgba(0,255,65,0.2)] transition-all duration-500 ease-out"
+                    strokeWidth="3" 
+                    className="drop-shadow-[0_0_15px_rgba(0,255,65,0.3)] transition-all duration-700 ease-in-out"
                   />
                 </svg>
-                <div className="absolute top-4 left-4 text-xs text-gray-500">EQUITY_CURVE (MONTE_CARLO_AVG)</div>
+                <div className="absolute top-4 left-4 text-xs text-gray-500 font-mono">EQUITY_CURVE (WALK_FORWARD_OPTIMIZATION)</div>
+                <div className="absolute bottom-4 right-4 text-xs text-gray-500 font-mono">SIMULATION_STEPS: 10,000</div>
               </div>
 
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 gap-4 content-start">
+              {/* Expanded Metrics Grid (10 items) */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-1 mt-1">
                 <div className="bg-[#111] p-4 border border-[#333]">
                   <div className="text-gray-500 text-[10px] uppercase mb-1">Total Return</div>
-                  <div className={`text-2xl font-bold ${parseFloat(metrics.return) > 0 ? 'text-[#00FF41]' : 'text-red-500'}`}>
+                  <div className={`text-xl font-bold ${parseFloat(metrics.return) > 0 ? 'text-[#00FF41]' : 'text-red-500'}`}>
                     {parseFloat(metrics.return) > 0 ? '+' : ''}{metrics.return}%
                   </div>
                 </div>
                 <div className="bg-[#111] p-4 border border-[#333]">
                   <div className="text-gray-500 text-[10px] uppercase mb-1">Sharpe Ratio</div>
-                  <div className="text-2xl font-bold text-white">{metrics.sharpe}</div>
+                  <div className="text-xl font-bold text-white">{metrics.sharpe}</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Sortino Ratio</div>
+                  <div className="text-xl font-bold text-white">{metrics.sortino}</div>
                 </div>
                 <div className="bg-[#111] p-4 border border-[#333]">
                   <div className="text-gray-500 text-[10px] uppercase mb-1">Max Drawdown</div>
-                  <div className="text-2xl font-bold text-red-500">-{metrics.drawdown}%</div>
+                  <div className="text-xl font-bold text-red-500">-{metrics.drawdown}%</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Profit Factor</div>
+                  <div className="text-xl font-bold text-white">{metrics.profitFactor}</div>
                 </div>
                 <div className="bg-[#111] p-4 border border-[#333]">
                   <div className="text-gray-500 text-[10px] uppercase mb-1">Win Rate</div>
-                  <div className="text-2xl font-bold text-white">{metrics.winRate}%</div>
+                  <div className="text-xl font-bold text-white">{metrics.winRate}%</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">CAGR</div>
+                  <div className="text-xl font-bold text-white">{metrics.cagr}%</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Avg Win</div>
+                  <div className="text-xl font-bold text-[#00FF41]">${metrics.avgWin}</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">Avg Loss</div>
+                  <div className="text-xl font-bold text-red-500">${metrics.avgLoss}</div>
+                </div>
+                <div className="bg-[#111] p-4 border border-[#333]">
+                  <div className="text-gray-500 text-[10px] uppercase mb-1">SQN Score</div>
+                  <div className="text-xl font-bold text-blue-400">{metrics.sqn}</div>
                 </div>
               </div>
             </div>
