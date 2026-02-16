@@ -2,16 +2,26 @@
 
 import { useState } from 'react';
 import { Rocket } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import TerminalLabel from '@/components/common/TerminalLabel';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function DeployTab() {
   const [brokerage, setBrokerage] = useState('alpaca');
   const [capital, setCapital] = useState('50000');
-  const [maxPosition, setMaxPosition] = useState(30);
+  const [maxPosition, setMaxPosition] = useState([30]);
   const [stopLoss, setStopLoss] = useState('2.1');
   const [takeProfit, setTakeProfit] = useState('5.3');
   const [maxHolding, setMaxHolding] = useState('50');
@@ -19,72 +29,124 @@ export default function DeployTab() {
   const [timeDecay, setTimeDecay] = useState(false);
 
   return (
-    <Card className="max-w-[600px]">
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-4">
-          {/* Deployment Config */}
-          <TerminalLabel icon="⊞">DEPLOYMENT_CONFIG</TerminalLabel>
-
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Brokerage</label>
-              <select value={brokerage} onChange={(e) => setBrokerage(e.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="alpaca">Alpaca (Paper)</option>
-                <option value="ib">Interactive Brokers</option>
-                <option value="td">TD Ameritrade</option>
-              </select>
+    <div className="max-w-2xl">
+      <Card>
+        <CardHeader>
+          <CardTitle>Deployment Configuration</CardTitle>
+          <CardDescription>Configure brokerage, capital, and risk parameters before launch</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Brokerage & Capital */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="brokerage">Brokerage</Label>
+              <Select value={brokerage} onValueChange={setBrokerage}>
+                <SelectTrigger id="brokerage">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="alpaca">Alpaca (Paper)</SelectItem>
+                  <SelectItem value="ib">Interactive Brokers</SelectItem>
+                  <SelectItem value="td">TD Ameritrade</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Capital Allocation ($)</label>
-              <input type="number" value={capital} onChange={(e) => setCapital(e.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm numeric-data focus:outline-none focus:ring-2 focus:ring-primary" />
+            <div className="space-y-2">
+              <Label htmlFor="capital">Capital Allocation ($)</Label>
+              <Input
+                id="capital"
+                type="number"
+                value={capital}
+                onChange={(e) => setCapital(e.target.value)}
+                className="font-mono-data"
+              />
             </div>
+          </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs font-medium text-muted-foreground">MAX POSITION SIZE</label>
-                <span className="numeric-data text-xs font-bold">{maxPosition}%</span>
-              </div>
-              <input type="range" min={5} max={100} value={maxPosition} onChange={(e) => setMaxPosition(Number(e.target.value))} className="w-full accent-primary" />
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>5%</span><span>50%</span><span>100%</span>
-              </div>
+          {/* Position Size */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Max Position Size</Label>
+              <Badge variant="secondary" className="font-mono-data">{maxPosition[0]}%</Badge>
+            </div>
+            <Slider
+              value={maxPosition}
+              onValueChange={setMaxPosition}
+              min={5}
+              max={100}
+              step={5}
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>5%</span><span>50%</span><span>100%</span>
             </div>
           </div>
 
           <Separator />
 
           {/* Exit Rules */}
-          <TerminalLabel icon="⊞">EXIT_RULES</TerminalLabel>
+          <div className="space-y-1">
+            <h4 className="text-sm font-semibold">Exit Rules</h4>
+            <p className="text-xs text-muted-foreground">Define stop-loss, take-profit, and holding parameters</p>
+          </div>
 
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Stop Loss (%)</label>
-              <input type="number" value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm numeric-data focus:outline-none focus:ring-2 focus:ring-primary" step="0.1" />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="sl">Stop Loss (%)</Label>
+              <Input
+                id="sl"
+                type="number"
+                value={stopLoss}
+                onChange={(e) => setStopLoss(e.target.value)}
+                step="0.1"
+                className="font-mono-data"
+              />
             </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Take Profit (%)</label>
-              <input type="number" value={takeProfit} onChange={(e) => setTakeProfit(e.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm numeric-data focus:outline-none focus:ring-2 focus:ring-primary" step="0.1" />
+            <div className="space-y-2">
+              <Label htmlFor="tp">Take Profit (%)</Label>
+              <Input
+                id="tp"
+                type="number"
+                value={takeProfit}
+                onChange={(e) => setTakeProfit(e.target.value)}
+                step="0.1"
+                className="font-mono-data"
+              />
             </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Max Holding Period (bars)</label>
-              <input type="number" value={maxHolding} onChange={(e) => setMaxHolding(e.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm numeric-data focus:outline-none focus:ring-2 focus:ring-primary" />
+            <div className="space-y-2">
+              <Label htmlFor="mhp">Max Holding (bars)</Label>
+              <Input
+                id="mhp"
+                type="number"
+                value={maxHolding}
+                onChange={(e) => setMaxHolding(e.target.value)}
+                className="font-mono-data"
+              />
             </div>
+          </div>
 
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm">Trailing stop (ATR-based)</span>
-              <button onClick={() => setTrailingStop(!trailingStop)} className={`h-6 w-11 rounded-full transition-colors ${trailingStop ? 'bg-primary' : 'bg-muted'}`}>
-                <div className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${trailingStop ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
+              <div>
+                <Label htmlFor="trailing-stop">Trailing Stop (ATR-based)</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Dynamically adjust stop based on volatility</p>
+              </div>
+              <Switch
+                id="trailing-stop"
+                checked={trailingStop}
+                onCheckedChange={setTrailingStop}
+              />
             </div>
-
             <div className="flex items-center justify-between">
-              <span className="text-sm">Time-decay exit</span>
-              <button onClick={() => setTimeDecay(!timeDecay)} className={`h-6 w-11 rounded-full transition-colors ${timeDecay ? 'bg-primary' : 'bg-muted'}`}>
-                <div className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${timeDecay ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
+              <div>
+                <Label htmlFor="time-decay">Time-Decay Exit</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Close position when holding period erodes edge</p>
+              </div>
+              <Switch
+                id="time-decay"
+                checked={timeDecay}
+                onCheckedChange={setTimeDecay}
+              />
             </div>
           </div>
 
@@ -92,10 +154,10 @@ export default function DeployTab() {
 
           <Button size="lg" className="w-full bg-success text-white hover:bg-success/90">
             <Rocket className="mr-2 h-4 w-4" />
-            LAUNCH DEPLOYMENT
+            Launch Deployment
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

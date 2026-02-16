@@ -1,29 +1,34 @@
 'use client';
 
-import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import TerminalLabel from '@/components/common/TerminalLabel';
+import { Radio, ShieldAlert } from 'lucide-react';
 import FleetManagement from '@/components/operations/FleetManagement';
 import RiskDashboard from '@/components/operations/RiskDashboard';
 
 export default function OperationsPage() {
-  const [activeTab, setActiveTab] = useState('fleet');
-
   return (
-    <div className="flex flex-col gap-3">
-      <TerminalLabel icon="⚡">OPERATIONS</TerminalLabel>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-lg font-semibold">Operations</h2>
+        <p className="text-sm text-muted-foreground">Monitor and manage your live trading fleet</p>
+      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="fleet">Fleet Management</TabsTrigger>
-          <TabsTrigger value="risk">Risk Intelligence</TabsTrigger>
+      <Tabs defaultValue="fleet" className="w-full">
+        <TabsList>
+          <TabsTrigger value="fleet" className="gap-2">
+            <Radio className="h-4 w-4" />
+            Fleet Management
+          </TabsTrigger>
+          <TabsTrigger value="risk" className="gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            Risk Intelligence
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="fleet" className="mt-3">
+        <TabsContent value="fleet" className="mt-6">
           <FleetManagement />
         </TabsContent>
-
-        <TabsContent value="risk" className="mt-3">
+        <TabsContent value="risk" className="mt-6">
           <RiskDashboard />
         </TabsContent>
       </Tabs>

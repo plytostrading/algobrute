@@ -1,25 +1,27 @@
 'use client';
 
-import { Sun, Cloud, CloudRain, Zap, ArrowRight, CheckCircle, PlusCircle, Eye, MinusCircle } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Sun, Cloud, CloudRain, Zap, ArrowRight, CheckCircle, PlusCircle, Eye, MinusCircle, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import TerminalLabel from '@/components/common/TerminalLabel';
-import InsightNarrative from '@/components/common/InsightNarrative';
-import RiskComfortMeter from '@/components/common/RiskComfortMeter';
-import { mockRiskIntelligence, mockPortfolio } from '@/mock/mockData';
+import { Progress } from '@/components/ui/progress';
+import { mockRiskIntelligence } from '@/mock/mockData';
 import { formatCurrency } from '@/utils/formatters';
 import type { RiskWeatherCondition, RiskGrade, RiskActionType, ScenarioSeverity } from '@/types';
 
 const weatherIcons: Record<RiskWeatherCondition, typeof Sun> = { clear: Sun, fair: Cloud, cloudy: CloudRain, stormy: Zap };
 const weatherLabels: Record<RiskWeatherCondition, string> = { clear: 'Clear Skies', fair: 'Fair', cloudy: 'Cloudy', stormy: 'Stormy' };
+const weatherColors: Record<RiskWeatherCondition, { text: string; bg: string }> = {
+  clear: { text: 'text-success', bg: 'bg-success/10' },
+  fair: { text: 'text-info', bg: 'bg-info/10' },
+  cloudy: { text: 'text-warning', bg: 'bg-warning/10' },
+  stormy: { text: 'text-destructive', bg: 'bg-destructive/10' },
+};
 const gradeColor = (grade: RiskGrade) => grade.startsWith('A') ? 'text-success' : grade.startsWith('B') ? 'text-info' : grade.startsWith('C') ? 'text-warning' : 'text-destructive';
-const gradeBg = (grade: RiskGrade) => grade.startsWith('A') ? 'bg-success' : grade.startsWith('B') ? 'bg-info' : grade.startsWith('C') ? 'bg-warning' : 'bg-destructive';
-const severityConfig: Record<ScenarioSeverity, { color: string; border: string }> = {
-  moderate: { color: 'text-warning', border: 'border-warning' },
-  significant: { color: 'text-destructive', border: 'border-destructive' },
-  severe: { color: 'text-destructive', border: 'border-destructive' },
+const severityConfig: Record<ScenarioSeverity, { color: string; badge: 'secondary' | 'destructive' }> = {
+  moderate: { color: 'text-warning', badge: 'secondary' },
+  significant: { color: 'text-destructive', badge: 'destructive' },
+  severe: { color: 'text-destructive', badge: 'destructive' },
 };
 const actionIcons: Record<RiskActionType, typeof CheckCircle> = { keep: CheckCircle, add: PlusCircle, monitor: Eye, remove: MinusCircle };
 const actionColors: Record<RiskActionType, string> = { keep: 'text-success', add: 'text-info', monitor: 'text-warning', remove: 'text-destructive' };
@@ -27,102 +29,147 @@ const actionColors: Record<RiskActionType, string> = { keep: 'text-success', add
 export default function RiskDashboard() {
   const intel = mockRiskIntelligence;
   const WeatherIcon = weatherIcons[intel.weather.condition];
+  const wColors = weatherColors[intel.weather.condition];
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Chapter 1: Risk Weather Hero */}
+    <div className="flex flex-col gap-6">
+      {/* Risk Weather Hero */}
       <Card>
-        <CardContent className="p-4">
-          <TerminalLabel icon="☀" className="mb-3">RISK_WEATHER</TerminalLabel>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <WeatherIcon className="h-7 w-7 text-success" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Risk Weather
+          </CardTitle>
+          <CardAction>
+            <Badge variant="outline" className="font-mono-data font-bold text-base px-2.5">
+              {intel.weather.overallGrade}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4 md:flex-row md:items-start">
+            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${wColors.bg}`}>
+              <WeatherIcon className={`h-7 w-7 ${wColors.text}`} />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold capitalize">{weatherLabels[intel.weather.condition]}</span>
+                <span className="text-xs text-muted-foreground">· Risk level: {intel.weather.riskLevel}</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">{intel.weather.narrative}</p>
+
+              {/* Drawdown meter */}
               <div>
-                <div className="flex items-center gap-2">
-                  <Badge className={`${gradeBg(intel.weather.overallGrade)} text-white font-bold text-base px-2`}>{intel.weather.overallGrade}</Badge>
-                  <span className="text-sm font-semibold">{weatherLabels[intel.weather.condition]}</span>
+                <div className="flex justify-between mb-1">
+                  <span className="text-xs font-medium">Portfolio Drawdown</span>
+                  <span className="font-mono-data text-xs text-muted-foreground">
+                    {intel.weather.drawdownCurrent}% / {intel.weather.drawdownLimit}%
+                  </span>
                 </div>
-                <span className={`text-[9px] uppercase tracking-wider ${gradeColor(intel.weather.overallGrade)}`}>RISK LEVEL: {intel.weather.riskLevel.toUpperCase()}</span>
+                {(() => {
+                  const pct = Math.min((intel.weather.drawdownCurrent / intel.weather.drawdownLimit) * 100, 100);
+                  const indicatorClass = pct > 75 ? '[&>[data-slot=progress-indicator]]:bg-destructive' : pct > 50 ? '[&>[data-slot=progress-indicator]]:bg-warning' : '[&>[data-slot=progress-indicator]]:bg-success';
+                  return <Progress value={pct} className={`h-2 ${indicatorClass}`} />;
+                })()}
               </div>
             </div>
-            <div className="min-w-[220px] flex-1 max-w-[320px]">
-              <RiskComfortMeter label="PORTFOLIO DRAWDOWN" current={intel.weather.drawdownCurrent} limit={intel.weather.drawdownLimit} unit="%" showPercentOfLimit />
-            </div>
-            <p className="flex-1 text-[13px] leading-relaxed text-muted-foreground md:border-l md:pl-4">{intel.weather.narrative}</p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Chapter 2: Risk Budget */}
+      {/* Risk Budget */}
       <div>
-        <TerminalLabel icon="◧" className="mb-2">YOUR_RISK_BUDGET</TerminalLabel>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {intel.budget.items.map((item, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <RiskComfortMeter label={item.label.toUpperCase()} current={item.current} limit={item.limit} unit={item.unit} showPercentOfLimit />
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{item.explanation}</p>
-              </CardContent>
-            </Card>
-          ))}
+        <h3 className="text-sm font-semibold mb-3">Risk Budget</h3>
+        <div className="grid gap-4 md:grid-cols-3">
+          {intel.budget.items.map((item, i) => {
+            const pct = Math.min((item.current / item.limit) * 100, 100);
+            const indicatorClass = pct > 75 ? '[&>[data-slot=progress-indicator]]:bg-destructive' : pct > 50 ? '[&>[data-slot=progress-indicator]]:bg-warning' : '[&>[data-slot=progress-indicator]]:bg-success';
+            return (
+              <Card key={i}>
+                <CardContent className="pt-4">
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-xs font-medium">{item.label}</span>
+                    <span className="font-mono-data text-xs text-muted-foreground">
+                      {item.current}{item.unit} / {item.limit}{item.unit}
+                    </span>
+                  </div>
+                  <Progress value={pct} className={`h-1.5 mb-3 ${indicatorClass}`} />
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.explanation}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 
-      {/* Chapter 3: Deep Analysis */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      {/* Deep Analysis */}
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Diversification */}
         <Card>
-          <CardContent className="p-4">
-            <TerminalLabel icon="◉" className="mb-3">DIVERSIFICATION_REPORT</TerminalLabel>
-            <div className="flex flex-col items-center mb-4 py-2">
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">OVERALL GRADE</span>
-              <Badge className={`${gradeBg(intel.diversification.overallGrade)} text-white font-black text-2xl px-3 py-1.5 rounded-md`}>{intel.diversification.overallGrade}</Badge>
-            </div>
-            <div className="flex flex-col gap-3">
+          <CardHeader>
+            <CardTitle>Diversification Report</CardTitle>
+            <CardAction>
+              <Badge variant="outline" className={`font-mono-data font-bold ${gradeColor(intel.diversification.overallGrade)}`}>
+                {intel.diversification.overallGrade}
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
               {intel.diversification.dimensions.map((dim, i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  <Badge variant={dim.grade.startsWith('A') || dim.grade.startsWith('B') ? 'outline' : 'default'} className={`text-[11px] font-bold min-w-[32px] justify-center flex-shrink-0 ${dim.grade.startsWith('C') || dim.grade === 'D' || dim.grade === 'F' ? gradeBg(dim.grade) + ' text-white' : ''}`}>{dim.grade}</Badge>
+                <div key={i} className="flex items-start gap-3">
+                  <Badge variant="outline" className={`text-xs font-bold min-w-[32px] justify-center shrink-0 ${gradeColor(dim.grade)}`}>
+                    {dim.grade}
+                  </Badge>
                   <div>
-                    <p className="text-xs font-semibold leading-tight">{dim.label}</p>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">{dim.explanation}</p>
+                    <p className="text-xs font-semibold">{dim.label}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{dim.explanation}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-4">
-              <InsightNarrative compact>{intel.diversification.narrative}</InsightNarrative>
-            </div>
+            {intel.diversification.narrative && (
+              <div className="mt-4 pt-4 border-t">
+                <div className="rounded-lg border-l-4 border-info bg-info/5 p-3">
+                  <p className="text-xs font-semibold text-info mb-0.5">Insight</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{intel.diversification.narrative}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Stress Scenarios */}
         <Card>
-          <CardContent className="p-4">
-            <TerminalLabel icon="⚡" className="mb-3">WHAT_COULD_GO_WRONG</TerminalLabel>
-            <div className="flex flex-col">
-              {intel.stressScenarios.map((scenario, idx) => {
+          <CardHeader>
+            <CardTitle>What Could Go Wrong</CardTitle>
+            <CardDescription>Stress test scenarios based on historical events</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {intel.stressScenarios.map((scenario) => {
                 const sc = severityConfig[scenario.severity];
                 return (
-                  <div key={scenario.id} className={`border-l-[3px] ${sc.border} pl-3 py-2.5 ${idx < intel.stressScenarios.length - 1 ? 'border-b pb-3' : ''}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm">{scenario.icon}</span>
-                        <span className="text-[13px] font-semibold">{scenario.title}</span>
+                  <div key={scenario.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{scenario.icon}</span>
+                        <span className="text-sm font-semibold">{scenario.title}</span>
                       </div>
-                      <Badge variant="outline" className={`text-[9px] ${sc.color}`}>{scenario.severity.toUpperCase()}</Badge>
+                      <Badge variant={sc.badge} className="text-[10px]">{scenario.severity}</Badge>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-snug mb-1.5">{scenario.description}</p>
-                    <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
-                      <span className="numeric-data text-sm font-bold text-destructive">−{formatCurrency(scenario.estimatedLossDollar)}</span>
-                      <span className="text-[9px] text-muted-foreground">({scenario.estimatedLossPercent.toFixed(1)}%)</span>
-                      <span className="text-[9px] text-muted-foreground">·</span>
-                      <span className="numeric-data text-[9px] text-muted-foreground">{scenario.historicalOccurrences}× tested</span>
-                      <span className="text-[9px] text-muted-foreground">·</span>
-                      <span className="numeric-data text-[9px] text-muted-foreground">~{scenario.avgRecoveryDays}d recovery</span>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{scenario.description}</p>
+                    <div className="flex items-center gap-3 flex-wrap text-xs">
+                      <span className="font-mono-data font-bold text-destructive">−{formatCurrency(scenario.estimatedLossDollar)}</span>
+                      <span className="text-muted-foreground">({scenario.estimatedLossPercent.toFixed(1)}%)</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">{scenario.historicalOccurrences}× tested</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">~{scenario.avgRecoveryDays}d recovery</span>
                     </div>
-                    <div className="flex items-start gap-1.5">
-                      <span className="text-[11px]">🛡️</span>
-                      <span className="text-[10px] text-success leading-snug">{scenario.safetyNet}</span>
+                    <div className="flex items-center gap-1.5 text-xs text-success">
+                      <span>🛡️</span>
+                      <span>{scenario.safetyNet}</span>
                     </div>
                   </div>
                 );
@@ -132,24 +179,27 @@ export default function RiskDashboard() {
         </Card>
       </div>
 
-      {/* Chapter 4: Playbook */}
+      {/* Recommendations */}
       <Card>
-        <CardContent className="p-4">
-          <TerminalLabel icon="🎯" className="mb-3">WHAT_TO_DO_NEXT</TerminalLabel>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <CardHeader>
+          <CardTitle>What To Do Next</CardTitle>
+          <CardDescription>Prioritized recommendations for your portfolio</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {[...intel.recommendations].sort((a, b) => a.priority - b.priority).map((rec) => {
               const ActionIcon = actionIcons[rec.type];
               const color = actionColors[rec.type];
               return (
-                <div key={rec.priority} className={`rounded-md border border-t-[3px] bg-background p-3 flex flex-col`} style={{ borderTopColor: `var(--${rec.type === 'keep' ? 'success' : rec.type === 'add' ? 'info' : rec.type === 'monitor' ? 'warning' : 'destructive'})` }}>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="numeric-data text-[9px] text-muted-foreground">#{rec.priority}</span>
+                <div key={rec.priority} className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="font-mono-data text-[10px]">#{rec.priority}</Badge>
                     <ActionIcon className={`h-4 w-4 ${color}`} />
                   </div>
-                  <p className="text-xs font-semibold mb-1 leading-tight">{rec.title}</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed flex-1">{rec.description}</p>
+                  <p className="text-sm font-semibold">{rec.title}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{rec.description}</p>
                   {rec.ctaLabel && (
-                    <Button size="sm" variant="ghost" className={`mt-2 h-6 self-start text-[10px] font-semibold px-1 ${color}`}>
+                    <Button size="sm" variant="ghost" className={`h-7 px-2 text-xs ${color}`}>
                       {rec.ctaLabel} <ArrowRight className="ml-1 h-3 w-3" />
                     </Button>
                   )}

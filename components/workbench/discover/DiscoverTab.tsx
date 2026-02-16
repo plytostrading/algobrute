@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import TerminalLabel from '@/components/common/TerminalLabel';
+// Using Card headers instead of TerminalLabel
 
 const mockAlerts = [
   { id: 1, symbol: 'AAPL', signal: 'RSI Oversold', direction: 'long' as const, confidence: 87 },
@@ -21,11 +21,8 @@ const mockIdeas = [
   { id: 3, title: 'TLT Range Trade Setup', description: 'TLT oscillating between $88-$94 support/resistance. Bollinger squeeze forming.', asset: 'TLT' },
 ];
 
-interface DiscoverTabProps {
-  onSwitchToBuild: () => void;
-}
-
-export default function DiscoverTab({ onSwitchToBuild }: DiscoverTabProps) {
+export default function DiscoverTab() {
+  const onSwitchToBuild = () => {}; // Will be connected to tab state
   const [ticker, setTicker] = useState('');
 
   return (
@@ -46,7 +43,7 @@ export default function DiscoverTab({ onSwitchToBuild }: DiscoverTabProps) {
         {/* Scanner Alerts */}
         <Card>
           <CardContent className="p-4">
-            <TerminalLabel icon="⚡" className="mb-3">SCANNER_ALERTS</TerminalLabel>
+            <p className="text-sm font-semibold mb-3">Scanner Alerts</p>
             <div className="flex flex-col gap-2">
               {mockAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-center justify-between rounded-md border bg-background p-2.5 cursor-pointer hover:border-primary transition-colors" onClick={onSwitchToBuild}>
@@ -75,7 +72,7 @@ export default function DiscoverTab({ onSwitchToBuild }: DiscoverTabProps) {
         {/* LLM Trade Ideas */}
         <Card>
           <CardContent className="p-4">
-            <TerminalLabel icon="✦" className="mb-3">LLM_TRADE_IDEAS</TerminalLabel>
+            <p className="text-sm font-semibold mb-3">Trade Ideas</p>
             <div className="flex flex-col gap-3">
               {mockIdeas.map((idea) => (
                 <div key={idea.id} className="rounded-md border bg-background p-3">

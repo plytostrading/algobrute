@@ -2,12 +2,13 @@ import type { Metadata } from 'next';
 import './globals.css';
 import StoreProvider from '@/store/StoreProvider';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import RailNav from '@/components/layout/RailNav';
-import TopMetricsBar from '@/components/layout/TopMetricsBar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import AppSidebar from '@/components/layout/AppSidebar';
+import AppHeader from '@/components/layout/AppHeader';
 
 export const metadata: Metadata = {
-  title: 'AlgoBrute - Trading Platform',
-  description: 'Advanced algorithmic trading platform for retail traders',
+  title: 'AlgoBrute — Algorithmic Trading Platform',
+  description: 'Risk-aware algorithmic trading platform for retail traders',
 };
 
 export default function RootLayout({
@@ -16,19 +17,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light">
+    <html lang="en" className="light" suppressHydrationWarning>
       <body className="antialiased">
         <StoreProvider>
           <TooltipProvider>
-            <div className="flex h-screen overflow-hidden">
-              <RailNav />
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <TopMetricsBar />
-                <main className="flex-1 overflow-y-auto p-4">
-                  {children}
-                </main>
-              </div>
-            </div>
+            <SidebarProvider>
+              <AppSidebar />
+              <SidebarInset className="h-svh overflow-hidden">
+                <AppHeader />
+                <div className="flex-1 overflow-y-auto">
+                  <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                    {children}
+                  </div>
+                </div>
+              </SidebarInset>
+            </SidebarProvider>
           </TooltipProvider>
         </StoreProvider>
       </body>

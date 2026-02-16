@@ -1,37 +1,42 @@
 'use client';
 
-import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import TerminalLabel from '@/components/common/TerminalLabel';
+import { FlaskConical, Rocket, Search } from 'lucide-react';
 import BuildTab from '@/components/workbench/build/BuildTab';
-import DiscoverTab from '@/components/workbench/discover/DiscoverTab';
 import DeployTab from '@/components/workbench/deploy/DeployTab';
+import DiscoverTab from '@/components/workbench/discover/DiscoverTab';
 
 export default function WorkbenchPage() {
-  const [activeTab, setActiveTab] = useState('build');
-
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <TerminalLabel icon=">_">WORKBENCH</TerminalLabel>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-lg font-semibold">Strategy Workbench</h2>
+        <p className="text-sm text-muted-foreground">Discover, build, test, and deploy trading strategies</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="discover">Discover</TabsTrigger>
-          <TabsTrigger value="build">Build & Test</TabsTrigger>
-          <TabsTrigger value="deploy">Deploy</TabsTrigger>
+      <Tabs defaultValue="build" className="w-full">
+        <TabsList>
+          <TabsTrigger value="discover" className="gap-2">
+            <Search className="h-4 w-4" />
+            Discover
+          </TabsTrigger>
+          <TabsTrigger value="build" className="gap-2">
+            <FlaskConical className="h-4 w-4" />
+            Build & Test
+          </TabsTrigger>
+          <TabsTrigger value="deploy" className="gap-2">
+            <Rocket className="h-4 w-4" />
+            Deploy
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="discover" className="mt-3">
-          <DiscoverTab onSwitchToBuild={() => setActiveTab('build')} />
+        <TabsContent value="discover" className="mt-6">
+          <DiscoverTab />
         </TabsContent>
-
-        <TabsContent value="build" className="mt-3">
+        <TabsContent value="build" className="mt-6">
           <BuildTab />
         </TabsContent>
-
-        <TabsContent value="deploy" className="mt-3">
+        <TabsContent value="deploy" className="mt-6">
           <DeployTab />
         </TabsContent>
       </Tabs>

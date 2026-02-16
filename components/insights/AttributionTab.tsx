@@ -1,14 +1,13 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
-import TerminalLabel from '@/components/common/TerminalLabel';
-import ProgressBar from '@/components/common/ProgressBar';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const factorData = [
   { factor: 'Momentum', exposure: 0.45, contribution: 2.1 },
   { factor: 'Value', exposure: -0.12, contribution: -0.4 },
-  { factor: 'Vol', exposure: 0.28, contribution: 1.2 },
+  { factor: 'Volatility', exposure: 0.28, contribution: 1.2 },
   { factor: 'Size', exposure: 0.08, contribution: 0.2 },
   { factor: 'Quality', exposure: 0.32, contribution: 1.5 },
 ];
@@ -18,35 +17,42 @@ export default function AttributionTab() {
   const luckScore = 28;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-6">
       {/* Factor Analysis */}
       <Card>
-        <CardContent className="p-4">
-          <TerminalLabel icon="⊞" className="mb-3">FACTOR_ANALYSIS</TerminalLabel>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={factorData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="factor" tick={{ fontSize: 10, fontFamily: '"JetBrains Mono", monospace' }} stroke="var(--muted-foreground)" />
-                  <YAxis tick={{ fontSize: 10, fontFamily: '"JetBrains Mono", monospace' }} stroke="var(--muted-foreground)" />
-                  <Tooltip contentStyle={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, borderRadius: 6 }} />
-                  <Legend />
-                  <Bar dataKey="exposure" fill="#2563eb" name="Exposure" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+        <CardHeader>
+          <CardTitle>Factor Analysis</CardTitle>
+          <CardDescription>How different market factors contribute to your returns</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Factor Exposure</p>
+              <div className="h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={factorData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.5} />
+                    <XAxis dataKey="factor" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--color-popover)', borderColor: 'var(--color-border)', borderRadius: '8px', fontSize: '13px' }} />
+                    <Bar dataKey="exposure" fill="var(--color-chart-1)" name="Exposure" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={factorData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="factor" tick={{ fontSize: 10, fontFamily: '"JetBrains Mono", monospace' }} stroke="var(--muted-foreground)" />
-                  <YAxis tick={{ fontSize: 10, fontFamily: '"JetBrains Mono", monospace' }} stroke="var(--muted-foreground)" />
-                  <Tooltip contentStyle={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, borderRadius: 6 }} />
-                  <Legend />
-                  <Bar dataKey="contribution" fill="#10b981" name="Contribution (%)" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Return Contribution (%)</p>
+              <div className="h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={factorData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.5} />
+                    <XAxis dataKey="factor" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--color-popover)', borderColor: 'var(--color-border)', borderRadius: '8px', fontSize: '13px' }} />
+                    <Bar dataKey="contribution" fill="var(--color-chart-2)" name="Contribution (%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -54,31 +60,30 @@ export default function AttributionTab() {
 
       {/* Skill vs Luck */}
       <Card>
-        <CardContent className="p-4">
-          <TerminalLabel icon="✦" className="mb-3">SKILL_VS_LUCK</TerminalLabel>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <span className="text-sm">Skill Component</span>
-                <span className="numeric-data text-sm font-bold text-success">{skillScore}%</span>
+        <CardHeader>
+          <CardTitle>Skill vs Luck Decomposition</CardTitle>
+          <CardDescription>Based on t-statistic analysis of 186 trades over 12 months</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-5">
+            <div>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm font-medium">Skill Component</span>
+                <span className="font-mono-data text-sm font-bold text-success">{skillScore}%</span>
               </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-success transition-all" style={{ width: `${skillScore}%` }} />
-              </div>
+              <Progress value={skillScore} className="h-3 [&>[data-slot=progress-indicator]]:bg-success" />
             </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <span className="text-sm">Luck Component</span>
-                <span className="numeric-data text-sm font-bold text-info">{luckScore}%</span>
+            <div>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm font-medium">Luck Component</span>
+                <span className="font-mono-data text-sm font-bold text-info">{luckScore}%</span>
               </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-info transition-all" style={{ width: `${luckScore}%` }} />
-              </div>
+              <Progress value={luckScore} className="h-3 [&>[data-slot=progress-indicator]]:bg-info" />
             </div>
-            <div className="border-t pt-3">
-              <p className="text-[13px] text-muted-foreground">
-                Based on t-statistic analysis of 186 trades over 12 months. Your information ratio of 1.82 suggests
-                statistically significant alpha generation (p &lt; 0.01).
+            <div className="pt-2 border-t">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Your information ratio of 1.82 suggests statistically significant alpha generation (p &lt; 0.01).
+                This means your returns are primarily driven by skill rather than favorable market conditions.
               </p>
             </div>
           </div>

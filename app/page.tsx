@@ -1,29 +1,39 @@
-import FleetHealthHero from '@/components/command-center/FleetHealthHero';
+import KPICards from '@/components/command-center/KPICards';
+import PortfolioChart from '@/components/command-center/PortfolioChart';
 import FleetStatusGrid from '@/components/command-center/FleetStatusGrid';
 import ActionCuesPanel from '@/components/command-center/ActionCuesPanel';
+import RiskSummary from '@/components/command-center/RiskSummary';
 import PortfolioImpact from '@/components/command-center/PortfolioImpact';
-import { mockPortfolio, mockFleetHealth, mockUserProfile } from '@/mock/mockData';
+import {
+  mockPortfolio,
+  mockFleetHealth,
+  mockUserProfile,
+  mockBacktestResult,
+  mockRiskIntelligence,
+} from '@/mock/mockData';
 
 export default function CommandCenter() {
   return (
-    <div className="flex flex-col gap-3">
-      {/* Fleet Health Hero */}
-      <FleetHealthHero
-        status={mockFleetHealth.status}
-        equity={mockPortfolio.equity}
-        dayPL={mockPortfolio.dayPL}
-        dayPLPercent={mockPortfolio.dayPLPercent}
-        activeBots={mockPortfolio.activeDeployments}
+    <div className="flex flex-col gap-6">
+      {/* KPI Summary Cards */}
+      <KPICards
+        portfolio={mockPortfolio}
+        fleetStatus={mockFleetHealth.status}
         drawdownPercent={mockFleetHealth.drawdownPercent}
         drawdownTolerance={mockUserProfile.maxDrawdownTolerance}
-        narrative={mockFleetHealth.narrative}
       />
 
-      {/* Action Cues */}
+      {/* Action Cues — only shows if there are alerts */}
       <ActionCuesPanel />
 
+      {/* Portfolio Chart */}
+      <PortfolioChart equityCurve={mockBacktestResult.equityCurve} />
+
+      {/* Risk Summary */}
+      <RiskSummary risk={mockRiskIntelligence} />
+
       {/* Fleet + Portfolio Impact side by side */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <FleetStatusGrid />
         <PortfolioImpact />
       </div>
