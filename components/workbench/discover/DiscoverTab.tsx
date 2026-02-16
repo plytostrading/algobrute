@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { Search, TrendingUp, TrendingDown, ArrowRight, Sparkles } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-// Using Card headers instead of TerminalLabel
 
 const mockAlerts = [
   { id: 1, symbol: 'AAPL', signal: 'RSI Oversold', direction: 'long' as const, confidence: 87 },
@@ -22,7 +22,7 @@ const mockIdeas = [
 ];
 
 export default function DiscoverTab() {
-  const onSwitchToBuild = () => {}; // Will be connected to tab state
+  const onSwitchToBuild = () => {};
   const [ticker, setTicker] = useState('');
 
   return (
@@ -30,26 +30,29 @@ export default function DiscoverTab() {
       {/* Ticker Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
+        <Input
           type="text"
           placeholder="Search ticker (SPY, QQQ, AAPL...)"
           value={ticker}
           onChange={(e) => setTicker(e.target.value)}
-          className="w-full rounded-md border bg-background px-3 py-2 pl-10 text-sm numeric-data placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          className="pl-10 font-mono-data"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {/* Scanner Alerts */}
         <Card>
-          <CardContent className="p-4">
-            <p className="text-sm font-semibold mb-3">Scanner Alerts</p>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Scanner Alerts</CardTitle>
+            <CardDescription>{mockAlerts.length} active signals</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="flex flex-col gap-2">
               {mockAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-center justify-between rounded-md border bg-background p-2.5 cursor-pointer hover:border-primary transition-colors" onClick={onSwitchToBuild}>
                   <div className="flex items-center gap-2.5">
                     {alert.direction === 'long' ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
-                    <span className="numeric-data text-sm font-bold">{alert.symbol}</span>
+                    <span className="font-mono-data text-sm font-bold">{alert.symbol}</span>
                     <span className="text-xs text-muted-foreground">{alert.signal}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -71,8 +74,11 @@ export default function DiscoverTab() {
 
         {/* LLM Trade Ideas */}
         <Card>
-          <CardContent className="p-4">
-            <p className="text-sm font-semibold mb-3">Trade Ideas</p>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Trade Ideas</CardTitle>
+            <CardDescription>AI-generated strategy suggestions</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="flex flex-col gap-3">
               {mockIdeas.map((idea) => (
                 <div key={idea.id} className="rounded-md border bg-background p-3">

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
-import InsightNarrative from '@/components/common/InsightNarrative';
+import { Lightbulb } from 'lucide-react';
 import { mockBacktestResult } from '@/mock/mockData';
 import { formatPercent } from '@/utils/formatters';
 import type { RegimeAssessment, RegimeType } from '@/types';
@@ -33,7 +33,6 @@ export default function WalkForwardTab() {
   const { chartData, regimeBoundaries } = useMemo(() => {
     const dateMap = new Map<string, Record<string, number | undefined>>();
 
-    // Each OOS window gets its own series key
     for (const win of oosWindows) {
       const key = `oos${win.windowId}`;
       for (const pt of win.equityCurve) {
@@ -43,7 +42,6 @@ export default function WalkForwardTab() {
       }
     }
 
-    // Benchmark
     for (const bp of wf.benchmarkCurve) {
       const existing = dateMap.get(bp.date) || {};
       existing.benchmark = bp.spy;
@@ -66,7 +64,10 @@ export default function WalkForwardTab() {
   return (
     <div className="flex flex-col gap-3">
       {/* Narrative */}
-      <InsightNarrative compact>{narrative}</InsightNarrative>
+      <div className="flex items-start gap-2 rounded-md bg-muted/50 p-3">
+        <Lightbulb className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+        <p className="text-xs leading-relaxed text-foreground">{narrative}</p>
+      </div>
 
       {/* Regime span bar above chart */}
       <div className="flex px-12">
@@ -76,7 +77,7 @@ export default function WalkForwardTab() {
             className="flex-1 border-b-[3px] pb-1 text-center"
             style={{ borderBottomColor: win.color }}
           >
-            <span className="numeric-data text-[10px] text-muted-foreground">
+            <span className="font-mono-data text-[10px] text-muted-foreground">
               {regimeLabels[win.regimeLabel]}
             </span>
           </div>
@@ -87,11 +88,12 @@ export default function WalkForwardTab() {
       <div className="h-[280px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 4, right: 10, left: 10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 9, fontFamily: '"JetBrains Mono", monospace' }}
-              stroke="var(--muted-foreground)"
+              tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+              tickLine={false}
+              axisLine={false}
               tickFormatter={(d: string) => {
                 const dt = new Date(d);
                 return dt.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
@@ -99,18 +101,19 @@ export default function WalkForwardTab() {
               interval={Math.floor(chartData.length / 7)}
             />
             <YAxis
-              tick={{ fontSize: 9, fontFamily: '"JetBrains Mono", monospace' }}
-              stroke="var(--muted-foreground)"
+              tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+              tickLine={false}
+              axisLine={false}
               tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
               domain={['auto', 'auto']}
+              width={55}
             />
             <Tooltip
               contentStyle={{
-                fontFamily: '"JetBrains Mono", monospace',
-                fontSize: 11,
-                borderRadius: 6,
-                border: '1px solid var(--border)',
-                background: 'var(--card)',
+                backgroundColor: 'var(--color-popover)',
+                borderColor: 'var(--color-border)',
+                borderRadius: '8px',
+                fontSize: '13px',
               }}
               labelFormatter={(l: string) => new Date(l).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               formatter={(v: number, name: string) => {
@@ -127,7 +130,7 @@ export default function WalkForwardTab() {
               <ReferenceLine
                 key={i}
                 x={b.date}
-                stroke="var(--muted-foreground)"
+                stroke="var(--color-muted-foreground)"
                 strokeDasharray="4 4"
                 strokeWidth={0.75}
                 strokeOpacity={0.5}
@@ -182,14 +185,14 @@ export default function WalkForwardTab() {
         <table className="w-full">
           <thead>
             <tr className="border-b bg-muted/40">
-              <th className="numeric-data px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Period</th>
-              <th className="numeric-data px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Regime</th>
-              <th className="numeric-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Return</th>
-              <th className="numeric-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sharpe</th>
-              <th className="numeric-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Max DD</th>
-              <th className="numeric-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Win Rate</th>
-              <th className="numeric-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">P. Factor</th>
-              <th className="numeric-data px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Grade</th>
+              <th className="font-mono-data px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Period</th>
+              <th className="font-mono-data px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Regime</th>
+              <th className="font-mono-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Return</th>
+              <th className="font-mono-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sharpe</th>
+              <th className="font-mono-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Max DD</th>
+              <th className="font-mono-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Win Rate</th>
+              <th className="font-mono-data px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">P. Factor</th>
+              <th className="font-mono-data px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Grade</th>
             </tr>
           </thead>
           <tbody>
@@ -197,7 +200,7 @@ export default function WalkForwardTab() {
               const ac = assessmentConfig[win.assessment];
               return (
                 <tr key={win.windowId} className="border-b last:border-b-0 hover:bg-muted/20 transition-colors">
-                  <td className="numeric-data px-3 py-2 text-xs text-muted-foreground">
+                  <td className="font-mono-data px-3 py-2 text-xs text-muted-foreground">
                     {win.startDate.slice(0, 7)} → {win.endDate.slice(0, 7)}
                   </td>
                   <td className="px-3 py-2">
@@ -206,23 +209,23 @@ export default function WalkForwardTab() {
                       <span className="text-xs">{win.regimeLabel}</span>
                     </div>
                   </td>
-                  <td className={`numeric-data px-3 py-2 text-right text-xs font-semibold ${win.performance.totalReturn >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  <td className={`font-mono-data px-3 py-2 text-right text-xs font-semibold ${win.performance.totalReturn >= 0 ? 'text-success' : 'text-destructive'}`}>
                     {win.performance.totalReturn > 0 ? '+' : ''}{formatPercent(win.performance.totalReturn)}
                   </td>
-                  <td className="numeric-data px-3 py-2 text-right text-xs font-semibold">
+                  <td className="font-mono-data px-3 py-2 text-right text-xs font-semibold">
                     {win.performance.sharpe.toFixed(2)}
                   </td>
-                  <td className="numeric-data px-3 py-2 text-right text-xs text-destructive">
+                  <td className="font-mono-data px-3 py-2 text-right text-xs text-destructive">
                     {formatPercent(win.risk.maxDrawdown)}
                   </td>
-                  <td className="numeric-data px-3 py-2 text-right text-xs">
+                  <td className="font-mono-data px-3 py-2 text-right text-xs">
                     {win.tradeStats.winRate}%
                   </td>
-                  <td className="numeric-data px-3 py-2 text-right text-xs">
+                  <td className="font-mono-data px-3 py-2 text-right text-xs">
                     {win.tradeStats.profitFactor.toFixed(2)}
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <Badge variant="outline" className={`numeric-data text-[10px] font-semibold ${ac.className} border-current/20`}>
+                    <Badge variant="outline" className={`font-mono-data text-[10px] font-semibold ${ac.className} border-current/20`}>
                       {ac.label}
                     </Badge>
                   </td>
@@ -235,9 +238,9 @@ export default function WalkForwardTab() {
 
       {/* Aggregate stats footer */}
       <p className="px-1 text-[11px] italic text-muted-foreground">
-        Mean OOS Sharpe <span className="numeric-data font-semibold">{wf.meanOosSharpe.toFixed(2)}</span> ·{' '}
-        <span className="numeric-data font-semibold">{wf.oosConsistency}%</span> profitable ·{' '}
-        <span className="numeric-data font-semibold">{wf.oosDegradation}%</span> IS→OOS degradation
+        Mean OOS Sharpe <span className="font-mono-data font-semibold">{wf.meanOosSharpe.toFixed(2)}</span> ·{' '}
+        <span className="font-mono-data font-semibold">{wf.oosConsistency}%</span> profitable ·{' '}
+        <span className="font-mono-data font-semibold">{wf.oosDegradation}%</span> IS→OOS degradation
       </p>
     </div>
   );

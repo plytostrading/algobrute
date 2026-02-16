@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -11,7 +11,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import TerminalLabel from '@/components/common/TerminalLabel';
 import type { ParseStatus } from './StrategyInput';
 
 interface StrategyRule {
@@ -62,11 +61,11 @@ function EditableRule({
     return (
       <div className="flex items-center gap-1">
         <Circle className="h-2 w-2 fill-current" style={{ color }} />
-        <span className="numeric-data text-sm text-muted-foreground">
+        <span className="font-mono-data text-sm text-muted-foreground">
           {rule.indicator}({rule.period}) {rule.operator}
         </span>
         <input
-          className="w-16 rounded border border-input bg-background px-2 py-0.5 text-sm numeric-data focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-16 rounded border border-input bg-background px-2 py-0.5 text-sm font-mono-data focus:outline-none focus:ring-1 focus:ring-ring"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={(e) => {
@@ -100,7 +99,7 @@ function EditableRule({
       onClick={() => setEditing(true)}
     >
       <Circle className="h-2 w-2 fill-current" style={{ color }} />
-      <span className="numeric-data flex-1 text-sm">{ruleText}</span>
+      <span className="font-mono-data flex-1 text-sm">{ruleText}</span>
       <Edit className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
     </div>
   );
@@ -113,11 +112,11 @@ export default function StrategyObject({ parseStatus = 'empty' }: StrategyObject
   const isEmpty = parseStatus === 'empty';
 
   const statusLabel = modified
-    ? 'MODIFIED'
+    ? 'Modified'
     : parseStatus === 'parsed'
-      ? 'GENERATED'
+      ? 'Generated'
       : parseStatus === 'parsing'
-        ? 'UPDATING...'
+        ? 'Updating...'
         : null;
 
   const statusVariant = modified ? 'secondary' : 'default';
@@ -126,30 +125,29 @@ export default function StrategyObject({ parseStatus = 'empty' }: StrategyObject
     <Card
       className={`flex h-full flex-col transition-all ${parseStatus === 'parsed' ? 'border-primary' : ''}`}
     >
-      <CardContent className="flex flex-1 flex-col p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <TerminalLabel icon="⊞">STRATEGY_OBJECT</TerminalLabel>
-          <div className="flex items-center gap-1.5">
-            {statusLabel && (
-              <Badge variant={statusVariant} className="h-5 text-[10px] numeric-data">
-                {statusLabel}
-              </Badge>
-            )}
-            {modified && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <RefreshCw className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Re-sync from input</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">Strategy Object</CardTitle>
+        <div className="flex items-center gap-1.5">
+          {statusLabel && (
+            <Badge variant={statusVariant} className="h-5 text-[10px] font-mono-data">
+              {statusLabel}
+            </Badge>
+          )}
+          {modified && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Re-sync from input</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
-
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col">
         <div className={`flex flex-1 flex-col gap-3 transition-opacity ${isEmpty ? 'opacity-45' : ''}`}>
           {/* Header */}
           <div className="flex flex-wrap items-center gap-2">
@@ -161,7 +159,7 @@ export default function StrategyObject({ parseStatus = 'empty' }: StrategyObject
           {/* Entry Rules */}
           <div>
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              ENTRY RULES
+              Entry Rules
             </p>
             <div className="space-y-0.5">
               {s.entryRules.map((rule, i) => (
@@ -178,7 +176,7 @@ export default function StrategyObject({ parseStatus = 'empty' }: StrategyObject
           {/* Exit Rules */}
           <div>
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              EXIT RULES
+              Exit Rules
             </p>
             <div className="space-y-0.5">
               {s.exitRules.map((rule, i) => (
@@ -197,25 +195,25 @@ export default function StrategyObject({ parseStatus = 'empty' }: StrategyObject
           {/* Risk Engine */}
           <div>
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              RISK ENGINE
+              Risk Engine
             </p>
             <div className="grid grid-cols-2 gap-2 rounded-md border p-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">STOP_LOSS</span>
-                <span className="numeric-data font-bold">{s.riskEngine.stopLoss}</span>
+                <span className="text-muted-foreground">Stop Loss</span>
+                <span className="font-mono-data font-bold">{s.riskEngine.stopLoss}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">TAKE_PROFIT</span>
-                <span className="numeric-data font-bold">{s.riskEngine.takeProfit}</span>
+                <span className="text-muted-foreground">Take Profit</span>
+                <span className="font-mono-data font-bold">{s.riskEngine.takeProfit}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">MODE</span>
-                <span className="numeric-data text-[10px] font-bold">{s.riskEngine.mode}</span>
+                <span className="text-muted-foreground">Mode</span>
+                <span className="font-mono-data text-[10px] font-bold">{s.riskEngine.mode}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">LIVE_UPDATE</span>
+                <span className="text-muted-foreground">Live Update</span>
                 <Badge variant={s.riskEngine.isLiveUpdating ? 'default' : 'secondary'} className="h-4 text-[10px]">
-                  {s.riskEngine.isLiveUpdating ? 'YES' : 'NO'}
+                  {s.riskEngine.isLiveUpdating ? 'Yes' : 'No'}
                 </Badge>
               </div>
             </div>
@@ -224,7 +222,7 @@ export default function StrategyObject({ parseStatus = 'empty' }: StrategyObject
 
         <Button className="mt-3 w-full bg-success hover:bg-success/90" disabled={isEmpty}>
           <Rocket className="mr-2 h-4 w-4" />
-          DEPLOY TO PAPER
+          Deploy to Paper
         </Button>
       </CardContent>
     </Card>

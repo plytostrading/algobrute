@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
-import TerminalLabel from '@/components/common/TerminalLabel';
 
 export type ParseStatus = 'empty' | 'typing' | 'parsing' | 'parsed' | 'error';
 
@@ -36,25 +35,24 @@ export default function StrategyInput({ onParse, parseStatus = 'empty' }: Strate
   const statusBadge = parseStatus === 'parsed' ? (
     <Badge variant="default" className="gap-1">
       <CheckCircle className="h-3 w-3" />
-      <span className="numeric-data text-[10px]">PARSED</span>
+      <span className="font-mono-data text-[10px]">PARSED</span>
     </Badge>
   ) : parseStatus === 'parsing' ? (
     <Badge variant="secondary" className="gap-1">
       <Loader2 className="h-3 w-3 animate-spin" />
-      <span className="numeric-data text-[10px]">PARSING...</span>
+      <span className="font-mono-data text-[10px]">PARSING...</span>
     </Badge>
   ) : null;
 
   return (
     <Card className="flex h-full flex-col">
-      <CardContent className="flex flex-1 flex-col p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <TerminalLabel icon=">_">STRATEGY_INPUT</TerminalLabel>
-          {statusBadge}
-        </div>
-
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">Strategy Input</CardTitle>
+        {statusBadge}
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col">
         <textarea
-          className="numeric-data flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="font-mono-data flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           rows={5}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -68,7 +66,7 @@ export default function StrategyInput({ onParse, parseStatus = 'empty' }: Strate
             {examplePrompts.map((ex, i) => (
               <p
                 key={i}
-                className="numeric-data cursor-pointer border-l-2 border-border pl-2 text-[11px] leading-relaxed text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                className="font-mono-data cursor-pointer border-l-2 border-border pl-2 text-[11px] leading-relaxed text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                 onClick={() => handleExample(ex)}
               >
                 {ex.length > 80 ? ex.slice(0, 80) + '…' : ex}
@@ -83,7 +81,7 @@ export default function StrategyInput({ onParse, parseStatus = 'empty' }: Strate
           disabled={!text.trim() || parseStatus === 'parsing'}
         >
           <Sparkles className="mr-2 h-4 w-4" />
-          GENERATE STRATEGY
+          Generate Strategy
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </CardContent>
