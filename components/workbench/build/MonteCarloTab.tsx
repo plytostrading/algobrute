@@ -1,0 +1,143 @@
+'use client';
+
+import InsightNarrative from '@/components/common/InsightNarrative';
+import { mockBacktestResult, mockUserProfile } from '@/mock/mockData';
+import { formatCurrency } from '@/utils/formatters';
+import {
+  ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from 'recharts';
+
+export default function MonteCarloTab() {
+  const mc = mockBacktestResult.monteCarlo;
+  const capital = mockUserProfile.capitalBase;
+  const savingsComparison = capital * 0.05;
+
+  const narrative = `Based on ${mc.simulationsCount.toLocaleString()} simulations of randomized trade sequences, there's an ${mc.probOfProfit}% chance this strategy is profitable over the next year. The median outcome adds ${formatCurrency(mc.medianReturnDollar)} to your ${formatCurrency(capital)} capital. In the worst 5% of scenarios, you could lose up to ${formatCurrency(Math.abs(mc.percentile5Dollar))}. Risk of ruin is extremely low at ${mc.riskOfRuin}%.`;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Narrative */}
+      <InsightNarrative compact>{narrative}</InsightNarrative>
+
+      {/* Fan Chart */}
+      <div className="h-[260px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={mc.distribution} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis
+              dataKey="period"
+              tick={{ fontSize: 9, fontFamily: '"JetBrains Mono", monospace' }}
+              stroke="var(--muted-foreground)"
+              label={{
+                value: 'Weeks',
+                position: 'insideBottom',
+                offset: -2,
+                style: { fontSize: 9, fontFamily: '"JetBrains Mono", monospace', fill: 'var(--muted-foreground)' },
+              }}
+            />
+            <YAxis
+              tick={{ fontSize: 9, fontFamily: '"JetBrains Mono", monospace' }}
+              stroke="var(--muted-foreground)"
+              tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+              domain={['auto', 'auto']}
+            />
+            <Tooltip
+              contentStyle={{
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 11,
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'var(--card)',
+              }}
+              labelFormatter={(l: number) => `Week ${l}`}
+              formatter={(v: number, name: string) => {
+                const labels: Record<string, string> = {
+                  p95: 'Best case (95th)',
+                  p75: '75th percentile',
+                  median: 'Median',
+                  p25: '25th percentile',
+                  p5: 'Worst case (5th)',
+                };
+                return [formatCurrency(v), labels[name] || name];
+              }}
+            />
+            {/* Outer band: p5 to p95 */}
+            <Area type="natural" dataKey="p95" stroke="none" fill="#22C55E" fillOpacity={0.06} />
+            <Area type="natural" dataKey="p5" stroke="none" fill="transparent" fillOpacity={0} />
+            {/* Inner band: p25 to p75 */}
+            <Area type="natural" dataKey="p75" stroke="none" fill="#22C55E" fillOpacity={0.12} />
+            <Area type="natural" dataKey="p25" stroke="none" fill="transparent" fillOpacity={0} />
+            {/* Median line */}
+            <Line type="natural" dataKey="median" stroke="#16A34A" strokeWidth={2.5} dot={false} />
+            {/* Worst case dashed */}
+            <Line type="natural" dataKey="p5" stroke="#EF4444" strokeWidth={1} strokeDasharray="4 2" dot={false} />
+            {/* Best case dashed */}
+            <Line type="natural" dataKey="p95" stroke="#22C55E" strokeWidth={1} strokeDasharray="4 2" dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Chart legend */}
+      <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 border-t-2 border-dashed border-[#22C55E]" />
+          <span className="text-[10px] text-muted-foreground">Best case (P95)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-[3px] w-4 rounded-sm bg-[#16A34A]" />
+          <span className="text-[10px] text-muted-foreground">Median</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 border-t-2 border-dashed border-[#EF4444]" />
+          <span className="text-[10px] text-muted-foreground">Worst case (P5)</span>
+        </div>
+      </div>
+
+      {/* Summary Stats Row */}
+      <div className="grid grid-cols-4 divide-x rounded-md border">
+        <div className="px-3 py-2.5">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">PROB OF PROFIT</span>
+          <span className="numeric-data text-sm font-bold">{mc.probOfProfit}%</span>
+        </div>
+        <div className="px-3 py-2.5">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">MEDIAN GAIN</span>
+          <span className="numeric-data text-sm font-bold text-success">+{formatCurrency(mc.medianReturnDollar)}</span>
+        </div>
+        <div className="px-3 py-2.5">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">WORST CASE (5th)</span>
+          <span className="numeric-data text-sm font-bold text-destructive">{formatCurrency(mc.percentile5Dollar)}</span>
+        </div>
+        <div className="px-3 py-2.5">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">RISK OF RUIN</span>
+          <span className="numeric-data text-sm font-bold">&lt;{mc.riskOfRuin}%</span>
+        </div>
+      </div>
+
+      {/* Additional stats */}
+      <div className="grid grid-cols-3 divide-x rounded-md border">
+        <div className="px-3 py-2.5">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">MEDIAN MAX DD</span>
+          <span className="numeric-data text-sm font-bold text-destructive">-{mc.maxDrawdownMedian}%</span>
+        </div>
+        <div className="px-3 py-2.5">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">BEST CASE (95th)</span>
+          <span className="numeric-data text-sm font-bold text-success">+{mc.percentile95}% (+{formatCurrency(mc.percentile95Dollar)})</span>
+        </div>
+        <div className="px-3 py-2.5">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">SIMULATIONS</span>
+          <span className="numeric-data text-sm font-bold">{mc.simulationsCount.toLocaleString()}</span>
+        </div>
+      </div>
+
+      {/* Contextual comparison */}
+      <p className="px-1 text-[11px] italic leading-relaxed text-muted-foreground">
+        For context: a high-yield savings account would earn ~{formatCurrency(savingsComparison)}/yr on {formatCurrency(capital)}.
+        This strategy's median outcome is{' '}
+        <span className="numeric-data font-semibold">{(mc.medianReturnDollar / savingsComparison).toFixed(1)}×</span>{' '}
+        that return — but with meaningful risk of drawdown. The {mc.probOfProfit}% probability of profit means roughly{' '}
+        <span className="numeric-data font-semibold">{Math.round(100 - mc.probOfProfit)}%</span> of the time you could end the year with less than you started.
+      </p>
+    </div>
+  );
+}
