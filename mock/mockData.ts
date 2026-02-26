@@ -43,21 +43,21 @@ export const mockDeployments: Deployment[] = [
   {
     id: 'dep-1', name: 'SPY Mean Reversion', strategyId: 'strat-1', status: 'active',
     capitalAllocated: 50000, dayPL: 456.78, totalPL: 3240.12, totalPLPercent: 6.48,
-    isPaper: false, activePositions: 1, createdAt: new Date('2024-01-15'),
+    isPaper: false, activePositions: 1, createdAt: '2024-01-15T00:00:00.000Z',
     narrative: 'Performing as expected for the current LOW_VOL regime. Day P&L is positive and within normal variance. This strategy historically returns +18% annualized in similar conditions.',
     isWithinExpected: true, drawdownVsTolerance: 14, currentDrawdown: 1.8, maxTestedDrawdown: 12, daysSinceStart: 47,
   },
   {
     id: 'dep-2', name: 'QQQ Momentum', strategyId: 'strat-2', status: 'active',
     capitalAllocated: 30000, dayPL: -125.43, totalPL: 1876.45, totalPLPercent: 6.25,
-    isPaper: false, activePositions: 2, createdAt: new Date('2024-01-20'),
+    isPaper: false, activePositions: 2, createdAt: '2024-01-20T00:00:00.000Z',
     narrative: 'Minor drawdown today after a losing trade on AAPL. This is within normal range — drawdowns of this size occurred every 6-8 weeks in backtesting and recovered within 2-5 trading days.',
     isWithinExpected: true, drawdownVsTolerance: 22, currentDrawdown: 2.8, maxTestedDrawdown: 14, daysSinceStart: 42,
   },
   {
     id: 'dep-3', name: 'TLT Range Trading', strategyId: 'strat-3', status: 'paused',
     capitalAllocated: 25000, dayPL: 0, totalPL: -543.21, totalPLPercent: -2.17,
-    isPaper: false, activePositions: 0, createdAt: new Date('2024-02-01'),
+    isPaper: false, activePositions: 0, createdAt: '2024-02-01T00:00:00.000Z',
     narrative: 'Paused after hitting 65% of daily loss limit. This strategy struggles in trending bond markets. Consider resuming when TLT returns to a range-bound regime.',
     isWithinExpected: false, drawdownVsTolerance: 45, currentDrawdown: 5.2, maxTestedDrawdown: 10, daysSinceStart: 30,
   },
@@ -77,13 +77,13 @@ export const mockPositions: Position[] = [
 export const mockActionCues: ActionCue[] = [
   {
     id: 'cue-1', severity: 'warning', message: 'Bot "QQQ Momentum" hit 65% of daily loss limit ($325/$500)',
-    action: 'Review positions', timestamp: new Date(),
+    action: 'Review positions', timestamp: new Date().toISOString(),
     historicalContext: 'This has happened 3 times this quarter. Each time the bot recovered within 2 trading days without intervention.',
     occurrenceCount: 3, avgRecoveryDays: 2,
   },
   {
     id: 'cue-2', severity: 'info', message: 'Market regime shifting: LOW_VOL → TRANSITIONAL (62% confidence)',
-    action: 'Review positions', timestamp: new Date(),
+    action: 'Review positions', timestamp: new Date().toISOString(),
     historicalContext: 'Your momentum strategies historically underperform during transitions. Consider reducing position sizes by 30%.',
     occurrenceCount: 0, avgRecoveryDays: 0,
   },
@@ -93,11 +93,11 @@ export const mockActionCues: ActionCue[] = [
 // Journal Entries
 // ============================================================
 export const mockJournalEntries: JournalEntry[] = [
-  { id: 'trade-1', deploymentId: 'dep-1', symbol: 'SPY', side: 'long', quantity: 50, entryPrice: 442.10, entryTime: new Date('2024-02-10T09:30:00'), exitPrice: 448.23, exitTime: new Date('2024-02-12T15:45:00'), grossPL: 306.50, netPL: 304.50, returnPercent: 1.39, commission: 2.00, holdingPeriod: 2880, notes: 'Clean RSI bounce, exited at SMA resistance' },
-  { id: 'trade-2', deploymentId: 'dep-2', symbol: 'QQQ', side: 'long', quantity: 100, entryPrice: 375.50, entryTime: new Date('2024-02-11T10:15:00'), exitPrice: 382.10, exitTime: new Date('2024-02-13T14:20:00'), grossPL: 660.00, netPL: 658.00, returnPercent: 1.76, commission: 2.00, holdingPeriod: 2760, notes: 'Momentum breakout, trailing stop triggered' },
-  { id: 'trade-3', deploymentId: 'dep-1', symbol: 'SPY', side: 'long', quantity: 40, entryPrice: 455.20, entryTime: new Date('2024-02-15T10:00:00'), exitPrice: 452.10, exitTime: new Date('2024-02-16T14:30:00'), grossPL: -124.00, netPL: -126.00, returnPercent: -0.68, commission: 2.00, holdingPeriod: 1470, notes: 'False RSI signal, stopped out' },
-  { id: 'trade-4', deploymentId: 'dep-2', symbol: 'QQQ', side: 'long', quantity: 80, entryPrice: 388.00, entryTime: new Date('2024-02-18T09:45:00'), exitPrice: 395.60, exitTime: new Date('2024-02-20T15:00:00'), grossPL: 608.00, netPL: 606.00, returnPercent: 1.96, commission: 2.00, holdingPeriod: 2835, notes: 'Strong momentum continuation' },
-  { id: 'trade-5', deploymentId: 'dep-3', symbol: 'TLT', side: 'short', quantity: 200, entryPrice: 92.50, entryTime: new Date('2024-02-19T11:00:00'), exitPrice: 93.80, exitTime: new Date('2024-02-21T13:15:00'), grossPL: -260.00, netPL: -262.00, returnPercent: -1.41, commission: 2.00, holdingPeriod: 2895, notes: 'Range broke upward, stopped out' },
+  { id: 'trade-1', deploymentId: 'dep-1', symbol: 'SPY', side: 'long', quantity: 50, entryPrice: 442.10, entryTime: '2024-02-10T09:30:00.000Z', exitPrice: 448.23, exitTime: '2024-02-12T15:45:00.000Z', grossPL: 306.50, netPL: 304.50, returnPercent: 1.39, commission: 2.00, holdingPeriod: 2880, notes: 'Clean RSI bounce, exited at SMA resistance' },
+  { id: 'trade-2', deploymentId: 'dep-2', symbol: 'QQQ', side: 'long', quantity: 100, entryPrice: 375.50, entryTime: '2024-02-11T10:15:00.000Z', exitPrice: 382.10, exitTime: '2024-02-13T14:20:00.000Z', grossPL: 660.00, netPL: 658.00, returnPercent: 1.76, commission: 2.00, holdingPeriod: 2760, notes: 'Momentum breakout, trailing stop triggered' },
+  { id: 'trade-3', deploymentId: 'dep-1', symbol: 'SPY', side: 'long', quantity: 40, entryPrice: 455.20, entryTime: '2024-02-15T10:00:00.000Z', exitPrice: 452.10, exitTime: '2024-02-16T14:30:00.000Z', grossPL: -124.00, netPL: -126.00, returnPercent: -0.68, commission: 2.00, holdingPeriod: 1470, notes: 'False RSI signal, stopped out' },
+  { id: 'trade-4', deploymentId: 'dep-2', symbol: 'QQQ', side: 'long', quantity: 80, entryPrice: 388.00, entryTime: '2024-02-18T09:45:00.000Z', exitPrice: 395.60, exitTime: '2024-02-20T15:00:00.000Z', grossPL: 608.00, netPL: 606.00, returnPercent: 1.96, commission: 2.00, holdingPeriod: 2835, notes: 'Strong momentum continuation' },
+  { id: 'trade-5', deploymentId: 'dep-3', symbol: 'TLT', side: 'short', quantity: 200, entryPrice: 92.50, entryTime: '2024-02-19T11:00:00.000Z', exitPrice: 93.80, exitTime: '2024-02-21T13:15:00.000Z', grossPL: -260.00, netPL: -262.00, returnPercent: -1.41, commission: 2.00, holdingPeriod: 2895, notes: 'Range broke upward, stopped out' },
 ];
 
 // ============================================================
@@ -327,7 +327,7 @@ export const mockStrategy: Strategy = {
   entryRules: [{ indicator: 'RSI', operator: '<', value: 30, period: 14 }, { indicator: 'Price', operator: '>', value: '200_SMA', period: 200 }],
   exitRules: [{ indicator: 'RSI', operator: '>', value: 70, period: 14 }],
   riskEngine: { stopLoss: 2.1, takeProfit: 5.3, mode: 'TRAILING_ATR', isLiveUpdating: true },
-  createdAt: new Date('2024-01-10'),
+  createdAt: '2024-01-10T00:00:00.000Z',
 };
 
 // ============================================================
@@ -336,11 +336,11 @@ export const mockStrategy: Strategy = {
 export const mockRegimeIndicator: RegimeIndicator = { current: 'LOW_VOL', confidence: 94.2, volatilityATR: 1.42, trendStrength: 42.5 };
 
 export const mockLogEntries: LogEntry[] = [
-  { tag: 'DATA', message: 'Ingesting 1m candles [SPY]... OK', timestamp: new Date() },
-  { tag: 'ALGO', message: 'Calculating RSI(14): 18.2 < 30', timestamp: new Date() },
-  { tag: 'ALGO', message: 'Checking Price > 200 SMA: 418.7 > SMA', timestamp: new Date() },
-  { tag: 'RISK', message: 'Signal: WAIT (Conditions not met)', timestamp: new Date() },
-  { tag: 'LOGIC', message: 'NO_ACTION_TAKEN. Waiting for next tick...', timestamp: new Date() },
+  { tag: 'DATA', message: 'Ingesting 1m candles [SPY]... OK', timestamp: new Date().toISOString() },
+  { tag: 'ALGO', message: 'Calculating RSI(14): 18.2 < 30', timestamp: new Date().toISOString() },
+  { tag: 'ALGO', message: 'Checking Price > 200 SMA: 418.7 > SMA', timestamp: new Date().toISOString() },
+  { tag: 'RISK', message: 'Signal: WAIT (Conditions not met)', timestamp: new Date().toISOString() },
+  { tag: 'LOGIC', message: 'NO_ACTION_TAKEN. Waiting for next tick...', timestamp: new Date().toISOString() },
 ];
 
 export const mockCircuitBreaker: CircuitBreakerStatus = {

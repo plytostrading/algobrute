@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import StoreProvider from '@/store/StoreProvider';
+import QueryProvider from '@/store/QueryProvider';
+import GoogleAuthProvider from '@/store/GoogleAuthProvider';
+import { AuthProvider } from '@/store/AuthContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/layout/AppSidebar';
@@ -19,7 +22,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="light" suppressHydrationWarning>
       <body className="antialiased">
-        <StoreProvider>
+        <GoogleAuthProvider>
+          <AuthProvider>
+        <QueryProvider>
+          <StoreProvider>
           <TooltipProvider>
             <SidebarProvider>
               <AppSidebar />
@@ -33,7 +39,10 @@ export default function RootLayout({
               </SidebarInset>
             </SidebarProvider>
           </TooltipProvider>
-        </StoreProvider>
+          </StoreProvider>
+        </QueryProvider>
+          </AuthProvider>
+        </GoogleAuthProvider>
       </body>
     </html>
   );

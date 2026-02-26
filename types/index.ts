@@ -42,7 +42,7 @@ export interface Deployment {
   totalPLPercent: number;
   isPaper: boolean;
   activePositions: number;
-  createdAt: Date;
+  createdAt: string; // ISO 8601 string — Date objects are not Redux-serializable
   narrative: string;
   isWithinExpected: boolean;
   drawdownVsTolerance: number;
@@ -86,7 +86,7 @@ export interface ActionCue {
   severity: CueSeverity;
   message: string;
   action?: string;
-  timestamp: Date;
+  timestamp: string; // ISO 8601 string — Date objects are not Redux-serializable
   historicalContext: string;
   occurrenceCount: number;
   avgRecoveryDays: number;
@@ -102,9 +102,9 @@ export interface JournalEntry {
   side: TradeSide;
   quantity: number;
   entryPrice: number;
-  entryTime: Date;
+  entryTime: string; // ISO 8601 string — Date objects are not Redux-serializable
   exitPrice: number;
-  exitTime: Date;
+  exitTime: string; // ISO 8601 string — Date objects are not Redux-serializable
   grossPL: number;
   netPL: number;
   returnPercent: number;
@@ -247,7 +247,7 @@ export interface Strategy {
   entryRules: StrategyRule[];
   exitRules: StrategyRule[];
   riskEngine: { stopLoss: number; takeProfit: number; mode: string; isLiveUpdating: boolean };
-  createdAt: Date;
+  createdAt: string; // ISO 8601 string — Date objects are not Redux-serializable
 }
 
 // --- Logs ---
@@ -256,7 +256,7 @@ export type LogTag = 'DATA' | 'ALGO' | 'RISK' | 'LOGIC';
 export interface LogEntry {
   tag: LogTag;
   message: string;
-  timestamp: Date;
+  timestamp: string; // ISO 8601 string — Date objects are not Redux-serializable
 }
 
 // --- Circuit Breakers ---
