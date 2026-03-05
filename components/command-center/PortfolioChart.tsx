@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction }
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/utils/formatters';
 import type { BacktestResult, RegimeType } from '@/types';
+import type { BenchmarkComparison } from '@/types/api';
 
 const regimeColors: Record<RegimeType, string> = {
   LOW_VOL: '#dbeafe',
@@ -16,11 +17,13 @@ const regimeColors: Record<RegimeType, string> = {
 
 interface PortfolioChartProps {
   equityCurve: BacktestResult['equityCurve'];
+  /** Optional benchmark comparison — renders one muted anchor line when present */
+  benchmarkData?: BenchmarkComparison;
 }
 
 type TimeRange = '90D' | '1Y' | '3Y' | 'ALL';
 
-export default function PortfolioChart({ equityCurve }: PortfolioChartProps) {
+export default function PortfolioChart({ equityCurve, benchmarkData }: PortfolioChartProps) {
   const [range, setRange] = useState<TimeRange>('ALL');
 
   const chartData = useMemo(() => {
@@ -58,6 +61,13 @@ export default function PortfolioChart({ equityCurve }: PortfolioChartProps) {
   const endValue = chartData[chartData.length - 1]?.equity || 0;
   const totalReturn = startValue > 0 ? ((endValue - startValue) / startValue) * 100 : 0;
 
+  // Show SPY anchor only when all benchmark stats are valid finite numbers
+  const showBenchmark =
+    !!benchmarkData &&
+    isFinite(benchmarkData.beta) &&
+    isFinite(benchmarkData.alpha) &&
+    isFinite(benchmarkData.information_ratio);
+
   return (
     <Card>
       <CardHeader>
@@ -80,6 +90,14 @@ export default function PortfolioChart({ equityCurve }: PortfolioChartProps) {
         </CardAction>
       </CardHeader>
       <CardContent>
+        {showBenchmark && (
+          <p className="text-[11px] text-muted-foreground font-mono-data mb-2">
+            SPY β{' '}{benchmarkData!.beta.toFixed(2)}
+            {' '}·{' '}α{' '}
+            {benchmarkData!.alpha >= 0 ? '+' : ''}{benchmarkData!.alpha.toFixed(1)}%
+            {' '}·{' '}IR{' '}{benchmarkData!.information_ratio.toFixed(2)}
+          </p>
+        )}
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>

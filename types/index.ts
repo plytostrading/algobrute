@@ -282,6 +282,7 @@ export interface ExpectedBehaviorPoint {
 export type RiskWeatherCondition = 'clear' | 'fair' | 'cloudy' | 'stormy';
 export type RiskGrade = 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'F';
 export type RiskActionType = 'keep' | 'add' | 'monitor' | 'remove';
+export type RiskRecommendationType = 'kill' | 'pause' | 'reduce' | 'increase' | 'add' | 'rebalance';
 export type ScenarioSeverity = 'moderate' | 'significant' | 'severe';
 
 export interface RiskWeatherData {
@@ -335,10 +336,13 @@ export type RiskLinkTarget = 'fleet' | 'discover' | 'command-center';
 
 export interface RiskRecommendation {
   type: RiskActionType;
+  recommendationType?: RiskRecommendationType;
   title: string;
   description: string;
   priority: number;
   deploymentId?: string;
+  botName?: string;
+  evidence?: Record<string, number | string>;
   linkTarget?: RiskLinkTarget;
   ctaLabel?: string;
 }

@@ -74,10 +74,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ id_token: googleIdToken }),
       credentials: "include",
     });
+
     if (!res.ok) {
-      const err = (await res.json()) as { detail?: string };
-      throw new Error(err.detail ?? "Google login failed");
+      // Backend should return JSON (FastAPI), but in dev it's easy to end up with
+      // a plain-text/HTML error body (e.g. "Internal Server Error").
+      let detail: string | undefined;
+      try {
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const err = (await res.json()) as { detail?: string; message?: string };
+          detail = err.detail ?? err.message;
+        } else {
+          const text = await res.text();
+          detail = text?.trim() || undefined;
+        }
+      } catch {
+        // ignore parse errors
+      }
+
+      throw new Error(detail ?? `Google login failed (${res.status})`);
     }
+
     const data = (await res.json()) as { access_token: string };
     setAccessToken(data.access_token);
     setIsAuthenticated(true);

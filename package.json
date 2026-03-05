@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port 5173",
+    "dev": "npm run dev:clean",
+    "dev:clean": "rm -rf .next && next dev --turbopack --port 5173",
+    "dev:fast": "next dev --turbopack --port 5173",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test:e2e:smoke": "playwright test e2e/smoke.spec.ts"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.4",
-    "@reduxjs/toolkit": "^2.11.2",
     "@tanstack/react-query": "^5.90.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -19,8 +22,8 @@
     "radix-ui": "^1.4.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-redux": "^9.2.0",
     "recharts": "^2.15.4",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
@@ -29,6 +32,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@playwright/test": "^1.56.1",
     "eslint": "^9",
     "eslint-config-next": "15.5.12",
     "shadcn": "^3.8.4",

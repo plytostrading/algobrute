@@ -1,7 +1,6 @@
 'use client';
 
-import { useSelector, useDispatch } from 'react-redux';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Bell, Moon, Sun, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,11 +15,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import type { RootState } from '@/store/store';
-import { toggleColorMode } from '@/store/slices/uiSlice';
+import { useFleetRecommendations } from '@/hooks/useFleetRecommendations';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/store/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { useColorMode } from '@/hooks/useColorMode';
+import { getInitials } from '@/lib/user';
 
 const pageTitles: Record<string, string> = {
   '/': 'Command Center',
@@ -31,15 +35,25 @@ const pageTitles: Record<string, string> = {
 };
 
 export default function AppHeader() {
-  const dispatch = useDispatch();
   const pathname = usePathname();
-  const actionCues = useSelector((state: RootState) => state.portfolio.actionCues);
-  const colorMode = useSelector((state: RootState) => state.ui.colorMode);
-  const criticalCues = actionCues.filter((c) => c.severity === 'critical').length;
-  const warningCues = actionCues.filter((c) => c.severity === 'warning').length;
-  const totalAlerts = criticalCues + warningCues;
+  const router = useRouter();
+  const [colorMode, setColorMode] = useColorMode();
+  const { data: recommendations } = useFleetRecommendations();
+  const { data: profile } = useUserProfile();
+  const { logout } = useAuth();
+  const queryClient = useQueryClient();
+  const initials = profile ? getInitials(profile.email) : '…';
+
+  // Alert count: high-priority recommendations
+  const totalAlerts = (recommendations ?? []).filter((r) => r.priority === 'high').length;
 
   const pageTitle = pageTitles[pathname] || 'AlgoBrute';
+
+  const handleLogout = async () => {
+    await logout();
+    queryClient.clear();
+    router.replace('/login');
+  };
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
@@ -85,7 +99,7 @@ export default function AppHeader() {
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => dispatch(toggleColorMode())}
+              onClick={() => setColorMode(colorMode === 'light' ? 'dark' : 'light')}
             >
               {colorMode === 'light' ? (
                 <Moon className="h-4 w-4" />
@@ -102,14 +116,21 @@ export default function AppHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="text-xs">SM</AvatarFallback>
+                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end">
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Log out</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/settings')}>
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => void handleLogout()}
+            >
+              Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -1,69 +1,93 @@
 'use client';
 
-import { useSelector, useDispatch } from 'react-redux';
+import { useState } from 'react';
 import { AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { RootState } from '@/store/store';
-import { dismissCue } from '@/store/slices/portfolioSlice';
-import type { CueSeverity } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useFleetRecommendations } from '@/hooks/useFleetRecommendations';
+import RecommendationActionButton from '@/components/recommendations/RecommendationActionButton';
+import type { RecommendationPriority } from '@/types/api';
 
-const severityConfig: Record<CueSeverity, { icon: typeof AlertTriangle; color: string; bgColor: string; badgeVariant: 'default' | 'secondary' | 'destructive' }> = {
-  critical: { icon: AlertCircle, color: 'text-destructive', bgColor: 'bg-destructive/5 border-destructive/20', badgeVariant: 'destructive' },
-  warning: { icon: AlertTriangle, color: 'text-warning', bgColor: 'bg-warning/5 border-warning/20', badgeVariant: 'secondary' },
-  info: { icon: Info, color: 'text-info', bgColor: 'bg-info/5 border-info/20', badgeVariant: 'default' },
+type SeverityKey = 'high' | 'medium' | 'low';
+
+const severityConfig: Record<SeverityKey, { icon: typeof AlertTriangle; color: string; bgColor: string; badgeVariant: 'default' | 'secondary' | 'destructive' }> = {
+  high:   { icon: AlertCircle,  color: 'text-destructive', bgColor: 'bg-destructive/5 border-destructive/20', badgeVariant: 'destructive' },
+  medium: { icon: AlertTriangle, color: 'text-warning',    bgColor: 'bg-warning/5 border-warning/20',         badgeVariant: 'secondary'   },
+  low:    { icon: Info,          color: 'text-info',        bgColor: 'bg-info/5 border-info/20',               badgeVariant: 'default'     },
 };
 
-export default function ActionCuesPanel() {
-  const dispatch = useDispatch();
-  const cues = useSelector((state: RootState) => state.portfolio.actionCues);
+function toSeverityKey(priority: RecommendationPriority): SeverityKey {
+  return priority === 'high' ? 'high' : priority === 'medium' ? 'medium' : 'low';
+}
 
-  if (cues.length === 0) return null;
+export default function ActionCuesPanel() {
+  const { data: recommendations, isLoading } = useFleetRecommendations();
+  const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+
+  const visible = (recommendations ?? []).filter((_, i) => !dismissed.has(i));
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+      </div>
+    );
+  }
+
+  if (visible.length === 0) return null;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Action Required
-          <Badge variant="secondary" className="text-xs font-normal">{cues.length}</Badge>
+          <Badge variant="secondary" className="text-xs font-normal">{visible.length}</Badge>
         </CardTitle>
-        <CardDescription>Priority alerts and notifications for your fleet</CardDescription>
+        <CardDescription>Priority recommendations for your fleet</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {cues.map((cue) => {
-            const config = severityConfig[cue.severity];
+          {visible.map((rec, i) => {
+            const sev = toSeverityKey(rec.priority);
+            const config = severityConfig[sev];
             const Icon = config.icon;
+            const globalIdx = (recommendations ?? []).indexOf(rec);
 
             return (
               <div
-                key={cue.id}
+                key={i}
                 className={`flex items-start gap-3 rounded-lg border p-3 ${config.bgColor}`}
               >
                 <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${config.color}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{cue.message}</p>
-                  {cue.historicalContext && (
-                    <p className="text-xs text-muted-foreground mt-1">{cue.historicalContext}</p>
+                  <p className="text-sm font-medium">
+                    {rec.bot_name ? `${rec.bot_name}: ` : ''}{rec.reason}
+                  </p>
+                  {rec.estimated_impact && (
+                    <p className="text-xs text-muted-foreground mt-1">{rec.estimated_impact}</p>
                   )}
-                  {cue.occurrenceCount > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Occurred {cue.occurrenceCount}× before · Avg recovery: {cue.avgRecoveryDays} days
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Confidence: {rec.confidence}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {cue.action && (
-                    <Button variant="outline" size="sm" className="h-7 text-xs">
-                      {cue.action}
-                    </Button>
-                  )}
+                  <RecommendationActionButton
+                    recommendationType={rec.recommendation_type}
+                    botId={rec.bot_id}
+                    botName={rec.bot_name}
+                    reason={rec.reason}
+                    evidence={rec.evidence}
+                    buttonVariant="outline"
+                    buttonSize="sm"
+                    className="h-7 text-xs"
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => dispatch(dismissCue(cue.id))}
+                    onClick={() => setDismissed((prev) => new Set([...prev, globalIdx]))}
                   >
                     <X className="h-3.5 w-3.5" />
                   </Button>

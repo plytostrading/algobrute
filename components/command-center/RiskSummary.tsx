@@ -1,12 +1,15 @@
 'use client';
 
 import { Cloud, Sun, CloudRain, CloudLightning, ArrowRight, ShieldCheck, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
-import type { RiskIntelligenceData, RiskWeatherCondition } from '@/types';
+import RecommendationActionButton from '@/components/recommendations/RecommendationActionButton';
+import { formatRelativeTimeFromISOString } from '@/utils/formatters';
+import type { ReactNode } from 'react';
+import type { RiskActionType, RiskIntelligenceData, RiskWeatherCondition } from '@/types';
 
 const weatherIcons: Record<RiskWeatherCondition, typeof Sun> = {
   clear: Sun,
@@ -24,9 +27,18 @@ const weatherColors: Record<RiskWeatherCondition, { text: string; bg: string }> 
 
 interface RiskSummaryProps {
   risk: RiskIntelligenceData;
+  weatherTimestamp?: string | null;
+  /** Optional regime badge rendered inline in the Risk Weather card header */
+  regimeBadge?: ReactNode;
+}
+function toRecommendationType(type: RiskActionType): string {
+  if (type === 'add') return 'add';
+  if (type === 'remove') return 'kill';
+  if (type === 'monitor') return 'pause';
+  return 'keep';
 }
 
-export default function RiskSummary({ risk }: RiskSummaryProps) {
+export default function RiskSummary({ risk, weatherTimestamp, regimeBadge }: RiskSummaryProps) {
   const WeatherIcon = weatherIcons[risk.weather.condition];
   const colors = weatherColors[risk.weather.condition];
   const topRec = risk.recommendations[0];
@@ -39,6 +51,7 @@ export default function RiskSummary({ risk }: RiskSummaryProps) {
           <CardTitle className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
             Risk Weather
+            {regimeBadge && <span className="ml-1">{regimeBadge}</span>}
           </CardTitle>
           <CardAction>
             <Badge variant="outline" className="font-mono-data font-bold">
@@ -55,6 +68,11 @@ export default function RiskSummary({ risk }: RiskSummaryProps) {
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold capitalize">{risk.weather.condition}</span>
                 <span className="text-xs text-muted-foreground">· Risk level: {risk.weather.riskLevel}</span>
+                {weatherTimestamp && (
+                  <span className="text-xs text-muted-foreground">
+                    · Updated {formatRelativeTimeFromISOString(weatherTimestamp)}
+                  </span>
+                )}
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{risk.weather.narrative}</p>
             </div>
@@ -104,11 +122,16 @@ export default function RiskSummary({ risk }: RiskSummaryProps) {
                   <p className="text-xs font-semibold">{topRec.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{topRec.description}</p>
                 </div>
-                {topRec.ctaLabel && (
-                  <Button variant="outline" size="sm" className="h-7 text-xs shrink-0 ml-3">
-                    {topRec.ctaLabel}
-                  </Button>
-                )}
+                <RecommendationActionButton
+                  recommendationType={topRec.recommendationType ?? toRecommendationType(topRec.type)}
+                  botId={topRec.deploymentId}
+                  botName={topRec.botName}
+                  reason={topRec.description}
+                  evidence={topRec.evidence}
+                  buttonVariant="outline"
+                  buttonSize="sm"
+                  className={`h-7 text-xs shrink-0 ml-3 ${topRec.type === 'remove' ? 'text-destructive hover:text-destructive' : ''}`}
+                />
               </div>
             </div>
           )}

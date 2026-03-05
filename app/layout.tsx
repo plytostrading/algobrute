@@ -1,13 +1,10 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
-import StoreProvider from '@/store/StoreProvider';
 import QueryProvider from '@/store/QueryProvider';
 import GoogleAuthProvider from '@/store/GoogleAuthProvider';
 import { AuthProvider } from '@/store/AuthContext';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import AppSidebar from '@/components/layout/AppSidebar';
-import AppHeader from '@/components/layout/AppHeader';
+import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
   title: 'AlgoBrute — Algorithmic Trading Platform',
@@ -20,29 +17,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
+        {/* Inline theme init: reads localStorage before first paint to prevent flash */}
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var m=localStorage.getItem('color-mode');document.documentElement.classList.toggle('dark',m==='dark');document.documentElement.classList.toggle('light',m!=='dark');}catch(e){document.documentElement.classList.add('light');}})();`,
+          }}
+        />
         <GoogleAuthProvider>
           <AuthProvider>
-        <QueryProvider>
-          <StoreProvider>
-          <TooltipProvider>
-            <SidebarProvider>
-              <AppSidebar />
-              <SidebarInset className="h-svh overflow-hidden">
-                <AppHeader />
-                <div className="flex-1 overflow-y-auto">
-                  <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                    {children}
-                  </div>
-                </div>
-              </SidebarInset>
-            </SidebarProvider>
-          </TooltipProvider>
-          </StoreProvider>
-        </QueryProvider>
+            <QueryProvider>
+              {children}
+            </QueryProvider>
           </AuthProvider>
         </GoogleAuthProvider>
+        <Toaster />
       </body>
     </html>
   );

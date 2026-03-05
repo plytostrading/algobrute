@@ -1,148 +1,90 @@
 'use client';
 
 import { Lightbulb } from 'lucide-react';
-import { mockBacktestResult, mockUserProfile } from '@/mock/mockData';
-import { formatCurrency } from '@/utils/formatters';
-import {
-  ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
-} from 'recharts';
+import { Badge } from '@/components/ui/badge';
+import type { BacktestExportMonteCarlo, BacktestExportBootstrap } from '@/types/api';
 
-export default function MonteCarloTab() {
-  const mc = mockBacktestResult.monteCarlo;
-  const capital = mockUserProfile.capitalBase;
-  const savingsComparison = capital * 0.05;
+interface MonteCarloTabProps {
+  mc: BacktestExportMonteCarlo | null;
+  bootstrap: BacktestExportBootstrap | null;
+}
 
-  const narrative = `Based on ${mc.simulationsCount.toLocaleString()} simulations of randomized trade sequences, there's an ${mc.probOfProfit}% chance this strategy is profitable over the next year. The median outcome adds ${formatCurrency(mc.medianReturnDollar)} to your ${formatCurrency(capital)} capital. In the worst 5% of scenarios, you could lose up to ${formatCurrency(Math.abs(mc.percentile5Dollar))}. Risk of ruin is extremely low at ${mc.riskOfRuin}%.`;
+export default function MonteCarloTab({ mc, bootstrap }: MonteCarloTabProps) {
+  if (!mc && !bootstrap) {
+    return <p className="text-xs text-muted-foreground py-4 text-center">Monte Carlo analysis not available for this backtest.</p>;
+  }
+
+  const variants = mc ? Object.values(mc.variants) : [];
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Narrative */}
-      <div className="flex items-start gap-2 rounded-md bg-muted/50 p-3">
-        <Lightbulb className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-        <p className="text-xs leading-relaxed text-foreground">{narrative}</p>
-      </div>
+      {mc && (
+        <>
+          <div className="flex items-start gap-2 rounded-md bg-muted/50 p-3">
+            <Lightbulb className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+            <p className="text-xs leading-relaxed text-foreground">
+              Monte Carlo permutation test with {mc.n_simulations.toLocaleString()} simulations.
+              Overall p-value: <span className="font-mono-data font-semibold">{mc.overall_p_value.toFixed(3)}</span> —
+              {mc.significant_at_95pct ? ' significant at 95% confidence (strategy shows real edge).' : ' not significant at 95% confidence (possible overfitting).'}
+            </p>
+          </div>
 
-      {/* Fan Chart */}
-      <div className="h-[260px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={mc.distribution} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-            <XAxis
-              dataKey="period"
-              tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-              tickLine={false}
-              axisLine={false}
-              label={{
-                value: 'Weeks',
-                position: 'insideBottom',
-                offset: -2,
-                style: { fontSize: 10, fill: 'var(--color-muted-foreground)' },
-              }}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
-              domain={['auto', 'auto']}
-              width={55}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--color-popover)',
-                borderColor: 'var(--color-border)',
-                borderRadius: '8px',
-                fontSize: '13px',
-              }}
-              labelFormatter={(l: number) => `Week ${l}`}
-              formatter={(v: number, name: string) => {
-                const labels: Record<string, string> = {
-                  p95: 'Best case (95th)',
-                  p75: '75th percentile',
-                  median: 'Median',
-                  p25: '25th percentile',
-                  p5: 'Worst case (5th)',
-                };
-                return [formatCurrency(v), labels[name] || name];
-              }}
-            />
-            {/* Outer band: p5 to p95 */}
-            <Area type="natural" dataKey="p95" stroke="none" fill="var(--color-chart-2)" fillOpacity={0.06} />
-            <Area type="natural" dataKey="p5" stroke="none" fill="transparent" fillOpacity={0} />
-            {/* Inner band: p25 to p75 */}
-            <Area type="natural" dataKey="p75" stroke="none" fill="var(--color-chart-2)" fillOpacity={0.12} />
-            <Area type="natural" dataKey="p25" stroke="none" fill="transparent" fillOpacity={0} />
-            {/* Median line */}
-            <Line type="natural" dataKey="median" stroke="var(--color-chart-2)" strokeWidth={2.5} dot={false} />
-            {/* Worst case dashed */}
-            <Line type="natural" dataKey="p5" stroke="var(--color-chart-4)" strokeWidth={1} strokeDasharray="4 2" dot={false} />
-            {/* Best case dashed */}
-            <Line type="natural" dataKey="p95" stroke="var(--color-chart-2)" strokeWidth={1} strokeDasharray="4 2" dot={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
+          {/* Variant significance table */}
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Variant</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Real Sharpe</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Null Mean</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">p-value</th>
+                  <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sig. 95%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {variants.map((v) => (
+                  <tr key={v.variant_code} className="border-b last:border-b-0 hover:bg-muted/20 transition-colors">
+                    <td className="px-3 py-2 text-xs">{v.variant_name}</td>
+                    <td className="px-3 py-2 text-right font-mono-data text-xs font-semibold">{v.real_sharpe.toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right font-mono-data text-xs text-muted-foreground">{v.null_sharpe_mean.toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right font-mono-data text-xs">{v.p_value.toFixed(3)}</td>
+                    <td className="px-3 py-2 text-center">
+                      <Badge variant={v.significant_at_95pct ? 'default' : 'secondary'} className="text-[10px]">
+                        {v.significant_at_95pct ? '\u2713 Yes' : '\u2717 No'}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
-      {/* Chart legend */}
-      <div className="flex items-center justify-center gap-4">
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 border-t-2 border-dashed border-success" />
-          <span className="text-[10px] text-muted-foreground">Best case (P95)</span>
+      {/* Bootstrap CI */}
+      {bootstrap && (
+        <div className="rounded-md border p-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Stationary Bootstrap Sharpe CI ({(bootstrap.confidence_level * 100).toFixed(0)}%, {bootstrap.n_replicates.toLocaleString()} replicates)
+          </p>
+          <div className="grid grid-cols-3 gap-4 text-xs">
+            <div>
+              <span className="text-muted-foreground block">Observed Sharpe</span>
+              <span className="font-mono-data font-bold text-sm">{bootstrap.observed_sharpe.toFixed(3)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block">CI Range</span>
+              <span className="font-mono-data font-bold text-sm">[{bootstrap.ci_lower.toFixed(3)}, {bootstrap.ci_upper.toFixed(3)}]</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block">Excludes Zero</span>
+              <span className={`font-mono-data font-bold text-sm ${bootstrap.ci_excludes_zero ? 'text-success' : 'text-warning'}`}>
+                {bootstrap.ci_excludes_zero ? '\u2713 Yes' : '\u2717 No'}
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-[3px] w-4 rounded-sm bg-success" />
-          <span className="text-[10px] text-muted-foreground">Median</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 border-t-2 border-dashed border-destructive" />
-          <span className="text-[10px] text-muted-foreground">Worst case (P5)</span>
-        </div>
-      </div>
-
-      {/* Summary Stats Row */}
-      <div className="grid grid-cols-4 divide-x rounded-md border">
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Prob of Profit</span>
-          <span className="font-mono-data text-sm font-bold">{mc.probOfProfit}%</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Median Gain</span>
-          <span className="font-mono-data text-sm font-bold text-success">+{formatCurrency(mc.medianReturnDollar)}</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Worst Case (5th)</span>
-          <span className="font-mono-data text-sm font-bold text-destructive">{formatCurrency(mc.percentile5Dollar)}</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Risk of Ruin</span>
-          <span className="font-mono-data text-sm font-bold">&lt;{mc.riskOfRuin}%</span>
-        </div>
-      </div>
-
-      {/* Additional stats */}
-      <div className="grid grid-cols-3 divide-x rounded-md border">
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Median Max DD</span>
-          <span className="font-mono-data text-sm font-bold text-destructive">-{mc.maxDrawdownMedian}%</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Best Case (95th)</span>
-          <span className="font-mono-data text-sm font-bold text-success">+{mc.percentile95}% (+{formatCurrency(mc.percentile95Dollar)})</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Simulations</span>
-          <span className="font-mono-data text-sm font-bold">{mc.simulationsCount.toLocaleString()}</span>
-        </div>
-      </div>
-
-      {/* Contextual comparison */}
-      <p className="px-1 text-[11px] italic leading-relaxed text-muted-foreground">
-        For context: a high-yield savings account would earn ~{formatCurrency(savingsComparison)}/yr on {formatCurrency(capital)}.
-        This strategy&apos;s median outcome is{' '}
-        <span className="font-mono-data font-semibold">{(mc.medianReturnDollar / savingsComparison).toFixed(1)}×</span>{' '}
-        that return — but with meaningful risk of drawdown. The {mc.probOfProfit}% probability of profit means roughly{' '}
-        <span className="font-mono-data font-semibold">{Math.round(100 - mc.probOfProfit)}%</span> of the time you could end the year with less than you started.
-      </p>
+      )}
     </div>
   );
 }

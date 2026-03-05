@@ -1,8 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAlpacaStatus } from '@/hooks/useAlpacaStatus';
+import { useAuth } from '@/store/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { getInitials, getDisplayName } from '@/lib/user';
 import {
+  Briefcase,
   LayoutDashboard,
   FlaskConical,
   Radio,
@@ -28,11 +34,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const mainNav = [
+  { icon: Briefcase, label: 'Portfolio', path: '/portfolio' },
   { icon: LayoutDashboard, label: 'Command Center', path: '/' },
   { icon: FlaskConical, label: 'Workbench', path: '/workbench' },
   { icon: Radio, label: 'Operations', path: '/operations' },
@@ -45,8 +53,24 @@ const settingsNav = [
 
 export default function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const isActive = (path: string) =>
     path === '/' ? pathname === '/' : pathname.startsWith(path);
+  const { data: profile } = useUserProfile();
+  const { data: alpacaStatus } = useAlpacaStatus();
+  const { logout } = useAuth();
+  const queryClient = useQueryClient();
+  const initials = profile ? getInitials(profile.email) : '…';
+  const displayName = profile ? getDisplayName(profile.email) : 'Loading…';
+  const subtitle = profile
+    ? `${profile.expertise_level}${alpacaStatus?.connected ? ' · Alpaca ✓' : ''}`
+    : '…';
+
+  const handleLogout = async () => {
+    await logout();
+    queryClient.clear();
+    router.replace('/login');
+  };
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -133,12 +157,12 @@ export default function AppSidebar() {
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg bg-primary/10 text-xs font-semibold">
-                      SM
+                      {initials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Trader</span>
-                    <span className="truncate text-xs text-muted-foreground">Moderate Risk</span>
+                    <span className="truncate font-semibold">{displayName}</span>
+                    <span className="truncate text-xs text-muted-foreground capitalize">{subtitle}</span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />
                 </SidebarMenuButton>
@@ -149,10 +173,16 @@ export default function AppSidebar() {
                 align="end"
                 sideOffset={4}
               >
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Risk Settings</DropdownMenuItem>
-                <DropdownMenuItem>API Keys</DropdownMenuItem>
-                <DropdownMenuItem>Log out</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => void handleLogout()}
+                >
+                  Log out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

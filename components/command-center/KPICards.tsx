@@ -1,6 +1,6 @@
 'use client';
 
-import { TrendingUp, TrendingDown, Bot, ShieldAlert, DollarSign, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Bot, ShieldAlert, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { PortfolioSnapshot, FleetHealthStatus } from '@/types';
 import { formatCurrency, formatPercent } from '@/utils/formatters';
@@ -12,7 +12,7 @@ interface KPICardsProps {
   drawdownTolerance: number;
 }
 
-export default function KPICards({ portfolio, fleetStatus, drawdownPercent, drawdownTolerance }: KPICardsProps) {
+export default function KPICards({ portfolio, drawdownPercent, drawdownTolerance }: KPICardsProps) {
   const plPositive = portfolio.dayPL >= 0;
   const drawdownUsed = Math.round((drawdownPercent / drawdownTolerance) * 100);
 
@@ -25,16 +25,16 @@ export default function KPICards({ portfolio, fleetStatus, drawdownPercent, draw
       trend: null,
     },
     {
-      title: 'Day P&L',
+      title: 'Unrealized P&L',
       value: `${plPositive ? '+' : ''}${formatCurrency(portfolio.dayPL)}`,
-      subtitle: `${formatPercent(portfolio.dayPLPercent, true)} today`,
+      subtitle: `${formatPercent(portfolio.dayPLPercent, true)} of equity`,
       icon: plPositive ? TrendingUp : TrendingDown,
       trend: plPositive ? 'up' as const : 'down' as const,
     },
     {
       title: 'Active Bots',
       value: String(portfolio.activeDeployments),
-      subtitle: `${formatCurrency(portfolio.unrealizedPL)} unrealized`,
+      subtitle: `${formatCurrency(portfolio.unrealizedPL)} idle cash`,
       icon: Bot,
       trend: null,
     },

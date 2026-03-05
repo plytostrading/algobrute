@@ -18,6 +18,11 @@ const PUBLIC_PATHS = ["/login"];
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
+  // Never gate Next.js internals (HMR, chunks, etc.)
+  if (pathname.startsWith("/_next")) {
+    return NextResponse.next();
+  }
+
   // Always allow public paths through.
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
@@ -44,7 +49,7 @@ export const config = {
      * - /auth/*       (proxied to backend — must NOT be gated by middleware)
      * - /api/*        (proxied to backend — must NOT be gated by middleware)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public|auth|api).*)",
+    "/((?!_next|favicon.ico|public|auth|api).*)",
   ],
 };
 

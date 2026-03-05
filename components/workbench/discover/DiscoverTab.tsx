@@ -1,96 +1,153 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, TrendingUp, TrendingDown, ArrowRight, Sparkles } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useStrategies } from '@/hooks/useStrategies';
+import { useFleetRecommendations } from '@/hooks/useFleetRecommendations';
+import { getRecommendationLabel } from '@/lib/regimeLabel';
 
-const mockAlerts = [
-  { id: 1, symbol: 'AAPL', signal: 'RSI Oversold', direction: 'long' as const, confidence: 87 },
-  { id: 2, symbol: 'TSLA', signal: 'MACD Crossover', direction: 'long' as const, confidence: 72 },
-  { id: 3, symbol: 'NVDA', signal: 'Support Bounce', direction: 'long' as const, confidence: 65 },
-  { id: 4, symbol: 'META', signal: 'Resistance Rejection', direction: 'short' as const, confidence: 58 },
-];
+interface DiscoverTabProps {
+  onSelectStrategy: (strategyId: string) => void;
+}
 
-const mockIdeas = [
-  { id: 1, title: 'SPY Mean Reversion on RSI Dip', description: 'RSI(14) dropped below 30 while price holds above 200 SMA. Historical win rate: 62%.', asset: 'SPY' },
-  { id: 2, title: 'QQQ Momentum Breakout', description: 'Price breaking above 20-period high with volume surge. MACD positive divergence.', asset: 'QQQ' },
-  { id: 3, title: 'TLT Range Trade Setup', description: 'TLT oscillating between $88-$94 support/resistance. Bollinger squeeze forming.', asset: 'TLT' },
-];
+export default function DiscoverTab({ onSelectStrategy }: DiscoverTabProps) {
+  const { data: strategies, isLoading, isError } = useStrategies();
+  const {
+    data: recommendations,
+    isLoading: recsLoading,
+    isError: recsError,
+  } = useFleetRecommendations();
+  const [query, setQuery] = useState('');
 
-export default function DiscoverTab() {
-  const onSwitchToBuild = () => {};
-  const [ticker, setTicker] = useState('');
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = (strategies ?? []).filter((s) => s.is_active);
+    if (!q) return list;
+    return list.filter((s) => (s.name + ' ' + s.description + ' ' + s.strategy_id).toLowerCase().includes(q));
+  }, [strategies, query]);
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Ticker Search */}
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="Search ticker (SPY, QQQ, AAPL...)"
-          value={ticker}
-          onChange={(e) => setTicker(e.target.value)}
-          className="pl-10 font-mono-data"
+          placeholder="Search strategies…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="pl-10"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {/* Scanner Alerts */}
+        {/* Live Alerts */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Scanner Alerts</CardTitle>
-            <CardDescription>{mockAlerts.length} active signals</CardDescription>
+            <CardTitle className="text-sm font-medium">Fleet Alerts</CardTitle>
+            <CardDescription>Live recommendations from the analytics pipeline</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-2">
-              {mockAlerts.map((alert) => (
-                <div key={alert.id} className="flex items-center justify-between rounded-md border bg-background p-2.5 cursor-pointer hover:border-primary transition-colors" onClick={onSwitchToBuild}>
-                  <div className="flex items-center gap-2.5">
-                    {alert.direction === 'long' ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
-                    <span className="font-mono-data text-sm font-bold">{alert.symbol}</span>
-                    <span className="text-xs text-muted-foreground">{alert.signal}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={alert.confidence > 70 ? 'default' : 'outline'} className="text-[10px]">{alert.confidence}%</Badge>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button size="icon" variant="ghost" className="h-7 w-7">
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Use in strategy</p></TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {recsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : recsError ? (
+              <p className="text-sm text-destructive">Failed to load fleet alerts.</p>
+            ) : (recommendations ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No active alerts right now.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {(recommendations ?? []).slice(0, 5).map((rec, idx) => {
+                  const isRiskOff =
+                    rec.recommendation_type === 'kill' ||
+                    rec.recommendation_type === 'pause' ||
+                    rec.recommendation_type === 'reduce';
+
+                  return (
+                    <div
+                      key={`${rec.recommendation_type}-${rec.bot_id ?? idx}`}
+                      className="flex items-center justify-between rounded-md border bg-background p-2.5"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {isRiskOff ? (
+                          <TrendingDown className="h-4 w-4 text-destructive shrink-0" />
+                        ) : (
+                          <TrendingUp className="h-4 w-4 text-success shrink-0" />
+                        )}
+                        <span className="font-mono-data text-sm font-bold truncate">
+                          {rec.bot_name ?? 'Fleet'}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {rec.reason}
+                        </span>
+                      </div>
+                      <Badge
+                        variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'secondary' : 'outline'}
+                        className="text-[10px] shrink-0"
+                      >
+                        {getRecommendationLabel(rec.recommendation_type)}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* LLM Trade Ideas */}
+        {/* Strategies */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Trade Ideas</CardTitle>
-            <CardDescription>AI-generated strategy suggestions</CardDescription>
+            <CardTitle className="text-sm font-medium">Strategies</CardTitle>
+            <CardDescription>Choose a strategy and start a backtest</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-3">
-              {mockIdeas.map((idea) => (
-                <div key={idea.id} className="rounded-md border bg-background p-3">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Sparkles className="h-4 w-4 text-warning" />
-                    <span className="text-sm font-semibold">{idea.title}</span>
+            {isError && (
+              <p className="text-sm text-destructive">Failed to load strategies.</p>
+            )}
+
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {filtered.map((s) => (
+                  <div key={s.strategy_id} className="rounded-md border bg-background p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold truncate">{s.name}</span>
+                          <Badge variant="secondary" className="font-mono-data text-[10px]">
+                            {s.strategy_id}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                          {s.description}
+                        </p>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-xs" onClick={() => onSelectStrategy(s.strategy_id)}>
+                        Backtest →
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed mb-2">{idea.description}</p>
-                  <Button size="sm" variant="outline" className="text-xs" onClick={onSwitchToBuild}>Build Strategy →</Button>
-                </div>
-              ))}
-            </div>
+                ))}
+
+                {filtered.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No strategies match your search.</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

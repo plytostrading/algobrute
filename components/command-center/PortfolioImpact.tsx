@@ -2,77 +2,89 @@
 
 import { AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { mockPortfolioIntelligence } from '@/mock/mockData';
-import { formatCurrency, formatPercent } from '@/utils/formatters';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useFleetAnalytics } from '@/hooks/useFleetAnalytics';
+import { formatCurrency } from '@/utils/formatters';
 
 export default function PortfolioImpact() {
-  const intel = mockPortfolioIntelligence;
-  const maxImpact = Math.max(...intel.botImpacts.map((b) => Math.abs(b.equityImpactDollar)));
+  const { data: analytics, isLoading, isError } = useFleetAnalytics();
+
+  const maxRisk = analytics
+    ? Math.max(...analytics.bot_contributions.map((b) => Math.abs(b.component_risk)), 0.0001)
+    : 1;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Portfolio Impact</CardTitle>
-        <CardDescription>How each bot contributes to your portfolio</CardDescription>
+        <CardTitle>Portfolio Risk Attribution</CardTitle>
+        <CardDescription>Per-bot contribution to fleet volatility</CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Bot impact bars */}
-        <div className="space-y-4">
-          {intel.botImpacts.map((bot) => {
-            const isPositive = bot.equityImpactDollar >= 0;
-            const barWidth = Math.round((Math.abs(bot.equityImpactDollar) / maxImpact) * 100);
-
-            return (
-              <div key={bot.deploymentId}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-medium">{bot.name}</span>
-                  <span className={`font-mono-data text-sm font-semibold ${isPositive ? 'text-success' : 'text-destructive'}`}>
-                    {isPositive ? '+' : ''}{formatCurrency(bot.equityImpactDollar)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${isPositive ? 'bg-success' : 'bg-destructive'}`}
-                      style={{ width: `${barWidth}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground w-12 text-right">
-                    {bot.riskSharePercent}% risk
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{bot.sensitivityNarrative}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Correlations */}
-        <div className="mt-5 pt-4 border-t">
-          <p className="text-xs font-semibold mb-2">Correlations</p>
-          <div className="flex flex-wrap gap-2">
-            {intel.correlations.map((corr, i) => (
-              <Badge
-                key={i}
-                variant={corr.riskLevel === 'high' ? 'destructive' : corr.riskLevel === 'moderate' ? 'secondary' : 'outline'}
-                className="text-xs"
-              >
-                {corr.botA.split(' ')[0]} ↔ {corr.botB.split(' ')[0]}: {corr.correlation.toFixed(2)}
-              </Badge>
-            ))}
+        {isLoading && (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full rounded" />)}
           </div>
-        </div>
+        )}
 
-        {/* Concentration warning */}
-        {intel.concentrationWarning && (
-          <Alert className="mt-4" variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              {intel.concentrationWarning}
-            </AlertDescription>
-          </Alert>
+        {isError && (
+          <p className="text-sm text-destructive">Failed to load risk attribution. Please try again.</p>
+        )}
+
+        {!isLoading && !isError && analytics && (
+          <>
+            {/* Bot risk contribution bars */}
+            <div className="space-y-4">
+              {analytics.bot_contributions.map((bot) => {
+                const barWidth = Math.round((Math.abs(bot.component_risk) / maxRisk) * 100);
+                const isHighRisk = bot.risk_contribution_pct > 40;
+
+                return (
+                  <div key={bot.bot_id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium truncate">{bot.strategy_name}</span>
+                      <span className="font-mono-data text-sm font-semibold text-muted-foreground">
+                        {bot.risk_contribution_pct.toFixed(1)}% of risk
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            isHighRisk ? 'bg-destructive' : 'bg-primary'
+                          }`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground w-16 text-right">
+                        {formatCurrency(bot.component_risk)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Alloc: {(bot.allocation_pct * 100).toFixed(1)}% · Efficiency: {bot.risk_efficiency.toFixed(2)}
+                    </p>
+                  </div>
+                );
+              })}
+
+              {analytics.bot_contributions.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No bots with risk data yet.
+                </p>
+              )}
+            </div>
+
+            {/* Concentration alert */}
+            {analytics.concentration_alert && (
+              <Alert className="mt-4" variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Concentration alert: {analytics.least_risk_efficient} has the lowest risk efficiency.
+                  Consider rebalancing towards {analytics.most_risk_efficient}.
+                </AlertDescription>
+              </Alert>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

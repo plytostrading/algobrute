@@ -1,121 +1,163 @@
+// @deprecated — Superseded by BotAccordion (Batch 4). Kept for reference; safe to delete after PR is verified.
 'use client';
 
-import { useSelector, useDispatch } from 'react-redux';
-import { MoreHorizontal, Pause, Play, Eye, Circle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
+import { MoreHorizontal, Pause, Play, Eye, Circle, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { RootState } from '@/store/store';
-import { pauseDeployment, resumeDeployment } from '@/store/slices/deploymentsSlice';
-import { formatCurrency, formatPercent } from '@/utils/formatters';
-import type { DeploymentStatus } from '@/types';
+import { useBots, usePauseBot, useResumeBot } from '@/hooks/useBots';
+import { toast } from 'sonner';
+import { getBotStateColors } from '@/lib/colors';
+import { getBotStateLabel } from '@/lib/regimeLabel';
+import { formatCurrency } from '@/utils/formatters';
+import type { BotSnapshot } from '@/types/api';
 
-const statusConfig: Record<DeploymentStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; color: string }> = {
-  active: { label: 'Active', variant: 'default', color: 'text-success' },
-  paused: { label: 'Paused', variant: 'secondary', color: 'text-warning' },
-  stopped: { label: 'Stopped', variant: 'destructive', color: 'text-destructive' },
-  idle: { label: 'Idle', variant: 'outline', color: 'text-muted-foreground' },
-};
+function botNarrative(bot: BotSnapshot): string {
+  if (bot.drift_detected) return '⚠ Performance drift detected — rediscovery may be recommended.';
+  if (bot.rediscovery_recommended) return 'Rediscovery recommended based on recent trade patterns.';
+  if (bot.state === 'circuit_breaker') return 'Circuit breaker triggered. Bot paused until manual review.';
+  if (bot.state === 'paused_regime') return 'Bot paused automatically due to adverse regime conditions.';
+  return 'Bot operating normally within expected parameters.';
+}
 
 export default function FleetStatusGrid() {
-  const dispatch = useDispatch();
-  const deployments = useSelector((state: RootState) => state.deployments.list);
+  const router = useRouter();
+  const { data: bots, isLoading, isError } = useBots();
+  const pauseBot = usePauseBot();
+  const resumeBot = useResumeBot();
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Fleet Status</CardTitle>
-        <CardDescription>{deployments.length} bots deployed</CardDescription>
+        <CardDescription>
+          {isLoading ? 'Loading…' : `${bots?.length ?? 0} bots deployed`}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {deployments.map((dep) => {
-            const config = statusConfig[dep.status];
-            const plPositive = dep.totalPL >= 0;
-            const ddUsed = Math.round((dep.currentDrawdown / dep.maxTestedDrawdown) * 100);
+        {isLoading && (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-lg" />
+            ))}
+          </div>
+        )}
 
-            return (
-              <div
-                key={dep.id}
-                className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50"
-              >
-                {/* Status dot + info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Circle className={`h-2 w-2 fill-current ${config.color}`} />
-                    <span className="font-medium text-sm truncate">{dep.name}</span>
-                    <Badge variant={config.variant} className="text-[10px] h-5">
-                      {config.label}
-                    </Badge>
-                    {dep.isPaper && (
-                      <Badge variant="outline" className="text-[10px] h-5">Paper</Badge>
-                    )}
+        {isError && (
+          <p className="text-sm text-destructive">Failed to load fleet data. Please try again.</p>
+        )}
+
+        {!isLoading && !isError && (
+          <div className="space-y-4">
+            {(bots ?? []).map((bot) => {
+              const stateColors = getBotStateColors(bot.state);
+              const stateLabel = getBotStateLabel(bot.state);
+              const unrealizedPositive = bot.unrealized_pnl >= 0;
+              const sharpeDisplay = isNaN(bot.sharpe_realized)
+                ? '—'
+                : bot.sharpe_realized.toFixed(2);
+              const isPending =
+                pauseBot.isPending && pauseBot.variables === bot.bot_id ||
+                resumeBot.isPending && resumeBot.variables === bot.bot_id;
+
+              return (
+                <div
+                  key={bot.bot_id}
+                  className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50"
+                >
+                  {/* Status dot + info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Circle className={`h-2 w-2 fill-current ${stateColors.dotColor}`} />
+                      <span className="font-mono-data text-xs text-muted-foreground truncate">
+                        {bot.bot_id.substring(0, 8)}…
+                      </span>
+                      <Badge variant={stateColors.badgeVariant} className="text-[10px] h-5">
+                        {stateLabel}
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground line-clamp-1 mb-3">
+                      {botNarrative(bot)}
+                    </p>
+
+                    {/* Metrics row */}
+                    <div className="grid grid-cols-4 gap-3">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Capital</p>
+                        <p className="font-mono-data text-sm font-medium">{formatCurrency(bot.current_capital)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Unrealized P&L</p>
+                        <p className={`font-mono-data text-sm font-medium ${unrealizedPositive ? 'text-success' : 'text-destructive'}`}>
+                          {unrealizedPositive ? '+' : ''}{formatCurrency(bot.unrealized_pnl)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Open Trades</p>
+                        <p className="font-mono-data text-sm font-medium">{bot.n_open_trades}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Sharpe</p>
+                        <p className="font-mono-data text-sm font-medium">{sharpeDisplay}</p>
+                      </div>
+                    </div>
                   </div>
 
-                  <p className="text-xs text-muted-foreground line-clamp-1 mb-3">{dep.narrative}</p>
-
-                  {/* Metrics row */}
-                  <div className="grid grid-cols-4 gap-3">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Capital</p>
-                      <p className="font-mono-data text-sm font-medium">{formatCurrency(dep.capitalAllocated)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Day P&L</p>
-                      <p className={`font-mono-data text-sm font-medium ${dep.dayPL >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {dep.dayPL >= 0 ? '+' : ''}{formatCurrency(dep.dayPL)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total P&L</p>
-                      <p className={`font-mono-data text-sm font-medium ${plPositive ? 'text-success' : 'text-destructive'}`}>
-                        {plPositive ? '+' : ''}{formatCurrency(dep.totalPL)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Drawdown</p>
-                      <Progress
-                        value={ddUsed}
-                        className={`h-1.5 ${ddUsed > 60 ? '[&>[data-slot=progress-indicator]]:bg-destructive' : ddUsed > 40 ? '[&>[data-slot=progress-indicator]]:bg-warning' : '[&>[data-slot=progress-indicator]]:bg-success'}`}
-                      />
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{dep.currentDrawdown}% / {dep.maxTestedDrawdown}%</p>
-                    </div>
-                  </div>
+                  {/* Actions */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" disabled={isPending}>
+                        {isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {bot.state === 'active' && (
+                        <DropdownMenuItem onClick={() => pauseBot.mutate(bot.bot_id, {
+                          onSuccess: () => toast.success('Bot paused'),
+                          onError: (err) => toast.error(`Failed to pause: ${err.message}`),
+                        })}>
+                          <Pause className="mr-2 h-4 w-4" /> Pause
+                        </DropdownMenuItem>
+                      )}
+                      {(bot.state === 'paused_user' || bot.state === 'paused_regime' || bot.state === 'paused_monitoring') && (
+                        <DropdownMenuItem onClick={() => resumeBot.mutate(bot.bot_id, {
+                          onSuccess: () => toast.success('Bot resumed'),
+                          onError: (err) => toast.error(`Failed to resume: ${err.message}`),
+                        })}>
+                          <Play className="mr-2 h-4 w-4" /> Resume
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => router.push('/operations')}>
+                        <Eye className="mr-2 h-4 w-4" /> View in Operations
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
+              );
+            })}
 
-                {/* Actions */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {dep.status === 'active' ? (
-                      <DropdownMenuItem onClick={() => dispatch(pauseDeployment(dep.id))}>
-                        <Pause className="mr-2 h-4 w-4" /> Pause
-                      </DropdownMenuItem>
-                    ) : dep.status === 'paused' ? (
-                      <DropdownMenuItem onClick={() => dispatch(resumeDeployment(dep.id))}>
-                        <Play className="mr-2 h-4 w-4" /> Resume
-                      </DropdownMenuItem>
-                    ) : null}
-                    <DropdownMenuItem>
-                      <Eye className="mr-2 h-4 w-4" /> Details
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          })}
-        </div>
+            {bots?.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No bots deployed yet.
+              </p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
