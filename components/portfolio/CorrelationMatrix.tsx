@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleetCorrelation } from '@/hooks/useFleetCorrelation';
 import { useFleetCorrelationInsight } from '@/hooks/useFleetCorrelationInsight';
-import type { CorrelationPairInsight, Regime } from '@/types/api';
+import type { CorrelationPairContext, CorrelationPairInsight, Regime } from '@/types/api';
 
 const HIGH_CORR_THRESHOLD = 0.6;
 
@@ -58,6 +58,53 @@ function CorrBadge({ corr }: { corr: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// Pair context chips (deterministic — from pair_contexts, no LLM needed)
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts a CorrelationPairContext into human-readable chip labels.
+ *
+ * These are derived directly from the computed trade-history metrics and are
+ * always factually accurate (no LLM speculation involved).
+ */
+function buildContextChips(ctx: CorrelationPairContext): string[] {
+  const chips: string[] = [];
+
+  // Trade timing overlap
+  if (ctx.n_shared_exit_dates > 0) {
+    chips.push(`${Math.round(ctx.date_overlap_pct * 100)}% date overlap (${ctx.n_shared_exit_dates}d)`);
+    chips.push(`${Math.round(ctx.win_loss_cosign_rate * 100)}% win/loss sync`);
+  } else {
+    chips.push('No shared exit dates');
+  }
+
+  // Directional bias
+  const bothLong = ctx.long_pct_a >= 0.8 && ctx.long_pct_b >= 0.8;
+  const bothShort = ctx.long_pct_a <= 0.2 && ctx.long_pct_b <= 0.2;
+  if (bothLong) {
+    chips.push('Both LONG-biased');
+  } else if (bothShort) {
+    chips.push('Both SHORT-biased');
+  } else {
+    chips.push(`${Math.round(ctx.long_pct_a * 100)}% / ${Math.round(ctx.long_pct_b * 100)}% long`);
+  }
+
+  // Capital concentration
+  chips.push(`${ctx.combined_capital_pct.toFixed(1)}% fleet capital`);
+
+  // Holding-period proximity
+  const holdA = Math.round(ctx.avg_holding_bars_a);
+  const holdB = Math.round(ctx.avg_holding_bars_b);
+  if (Math.abs(holdA - holdB) <= 2) {
+    chips.push(`~${Math.round((holdA + holdB) / 2)}d avg hold`);
+  } else {
+    chips.push(`${holdA}d vs ${holdB}d hold`);
+  }
+
+  return chips;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -78,6 +125,7 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
   const botNames = data?.bot_names ?? [];
   const botTickers = data?.bot_tickers ?? [];
   const matrixValues = data?.matrix_values ?? [];
+  const pairContexts = data?.pair_contexts ?? [];
 
   const label = (i: number): string => {
     const ticker = botTickers[i] ?? '';
@@ -107,6 +155,17 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
         (p.bot_a === nameB && p.bot_b === nameA),
     );
   };
+
+  /**
+   * Look up the deterministic pair context for a specific bot pair.
+   * Sourced directly from the analytics API — no LLM involved.
+   */
+  const getPairContext = (nameA: string, nameB: string): CorrelationPairContext | undefined =>
+    pairContexts.find(
+      (c) =>
+        (c.bot_a === nameA && c.bot_b === nameB) ||
+        (c.bot_a === nameB && c.bot_b === nameA),
+    );
 
   return (
     <Card>
@@ -143,10 +202,12 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
               <p className="text-xs text-foreground font-medium">{insight.headline}</p>
             )}
 
-            {/* Per-pair rows — badge + risk label on first line; insight + drivers below */}
+            {/* Per-pair rows — badge + risk label on first line; evidence chips + LLM narrative below */}
             <div className="space-y-3">
               {pairs.map(({ i, j, corr }) => {
                 const pairInsight = getPairInsight(botNames[i], botNames[j]);
+                const pairCtx = getPairContext(botNames[i], botNames[j]);
+                const ctxChips = pairCtx ? buildContextChips(pairCtx) : [];
                 return (
                   <div key={`${i}-${j}`} className="space-y-0.5">
                     {/* Main row: names, badge, risk label — all inline */}
@@ -164,7 +225,7 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
                       )}
                     </div>
 
-                    {/* Insight sub-line: LLM explanation or loading skeleton */}
+                    {/* LLM narrative: interpretation of the evidence (shown when available) */}
                     {insightLoading && (
                       <Skeleton className="h-3 w-4/5 ml-0.5" />
                     )}
@@ -174,15 +235,18 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
                       </p>
                     )}
 
-                    {/* Driver chips: small pill tags for quantitative/qualitative factors */}
-                    {!insightLoading && pairInsight?.drivers && pairInsight.drivers.length > 0 && (
+                    {/* Factual context chips: deterministic, always available when live trades exist.
+                        These are the measured evidence that explains the correlation value —
+                        no LLM speculation. The correlation measures co-movement of realized
+                        P&L returns indexed by exit date, not price correlation. */}
+                    {ctxChips.length > 0 && (
                       <div className="flex flex-wrap gap-1 ml-0.5 mt-0.5">
-                        {pairInsight.drivers.map((driver, di) => (
+                        {ctxChips.map((chip, ci) => (
                           <span
-                            key={di}
+                            key={ci}
                             className="inline-flex items-center rounded-sm bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground border border-border"
                           >
-                            {driver}
+                            {chip}
                           </span>
                         ))}
                       </div>

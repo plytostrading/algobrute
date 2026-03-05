@@ -125,6 +125,44 @@ export interface CorrelatedPair {
   correlation: number;
 }
 
+/**
+ * Deterministic per-pair metrics computed from realized trade history.
+ * No LLM involved — these are factual computations from TradeModel records.
+ *
+ * Architecture: the EWMA correlation matrix is built from realized trade P&L%
+ * returns indexed by exit date (sparse: zero on days with no closed trade).
+ * High correlation means bots close trades on the same calendar dates AND with
+ * the same sign of P&L.
+ */
+export interface CorrelationPairContext {
+  bot_a: string;
+  bot_b: string;
+  ticker_a: string;
+  ticker_b: string;
+  /** Fraction 0–1 of total fleet capital */
+  capital_weight_a: number;
+  capital_weight_b: number;
+  /** (capital_weight_a + capital_weight_b) × 100 */
+  combined_capital_pct: number;
+  n_trades_a: number;
+  n_trades_b: number;
+  /** |exit_dates_A ∩ exit_dates_B| — days both bots have trade exits */
+  n_shared_exit_dates: number;
+  /** Jaccard similarity of exit-date sets (0 = no overlap, 1 = identical) */
+  date_overlap_pct: number;
+  /** Fraction of shared exit dates where P&L signs agree (0.5 = random) */
+  win_loss_cosign_rate: number;
+  /** Fraction of Bot A's trades that are LONG (0–1) */
+  long_pct_a: number;
+  /** Fraction of Bot B's trades that are LONG (0–1) */
+  long_pct_b: number;
+  avg_holding_bars_a: number;
+  avg_holding_bars_b: number;
+  /** Mode of Regime int at trade entry: 0=LOW_VOL 1=NORMAL 2=ELEVATED_VOL 3=CRISIS */
+  primary_entry_regime_a: number;
+  primary_entry_regime_b: number;
+}
+
 /** Single pair entry within CorrelationInsightResponse */
 export interface CorrelationPairInsight {
   bot_a: string;
@@ -157,6 +195,8 @@ export interface CorrelationAnalysis {
   source: string;
   max_pairwise_correlation: number;
   highly_correlated_pairs: CorrelatedPair[];
+  /** Deterministic per-pair metrics computed from trade history. Empty when no live trades. */
+  pair_contexts?: CorrelationPairContext[];
 }
 
 /** GET /api/fleet/var */
