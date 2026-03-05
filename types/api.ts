@@ -234,12 +234,17 @@ export interface BotRiskContribution {
   bot_id: string;
   strategy_name: string;
   allocation_pct: number;
+  risk_contribution_pct: number;
   standalone_volatility: number;
   marginal_contribution: number;
   component_risk: number;
-  risk_contribution_pct: number;
   risk_efficiency: number;
   diversification_benefit: number;
+  /**
+   * Standalone 1-day historical VaR (95%) for this bot in isolation.
+   * Comparing to risk_contribution_pct reveals diversifier vs. concentrator.
+   */
+  standalone_var_pct?: number;
 }
 
 /** GET /api/fleet/risk */
@@ -281,6 +286,11 @@ export interface BotPortfolioContribution {
   standalone_volatility: number;
   risk_efficiency: number;
   var_contribution_pct: number;
+  /**
+   * Standalone 1-day historical VaR (95%) for this bot in isolation.
+   * Use alongside risk_contribution_pct to identify portfolio diversifiers/concentrators.
+   */
+  standalone_var_pct?: number;
   regime_pnl: RegimePnLBreakdown[];
 }
 

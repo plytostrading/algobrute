@@ -317,7 +317,7 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-          Correlation Matrix
+          Deployed Bot Strategy Overlap Risk
         </CardTitle>
       </CardHeader>
 
