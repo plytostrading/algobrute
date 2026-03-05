@@ -58,6 +58,62 @@ function CorrBadge({ corr }: { corr: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// Co-occurrence correlation badge (conditional ρ on shared trading days)
+// ---------------------------------------------------------------------------
+
+/**
+ * Displays the conditional co-occurrence correlation — Pearson ρ computed only
+ * on the shared exit dates where both bots had closed trades.
+ *
+ * This is more interpretable than the EWMA badge because it removes the
+ * zero-padding suppression: you're reading the correlation of actual trading
+ * outcomes, not a sparse time series.
+ */
+function CoOccBadge({ rho }: { rho: number }) {
+  const formatted = rho.toFixed(2);
+  // Use same thresholds as CorrBadge for visual consistency
+  if (rho >= HIGH_CORR_THRESHOLD) {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-sm border border-red-500/60 px-1.5 py-0.5 text-[10px] font-mono font-semibold tabular-nums text-red-400"
+        title="Conditional co-occurrence ρ: Pearson correlation on shared trading days only (removes zero-padding)"
+      >
+        ρ<sub>occ</sub> {formatted}
+      </span>
+    );
+  }
+  if (rho >= 0.35) {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-sm border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-mono font-semibold tabular-nums text-amber-500/80"
+        title="Conditional co-occurrence ρ: Pearson correlation on shared trading days only (removes zero-padding)"
+      >
+        ρ<sub>occ</sub> {formatted}
+      </span>
+    );
+  }
+  if (rho <= -0.35) {
+    // Negative correlation — potential natural hedge
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-sm border border-emerald-500/50 px-1.5 py-0.5 text-[10px] font-mono font-semibold tabular-nums text-emerald-400"
+        title="Conditional co-occurrence ρ: negative — bots tend to offset each other on shared trading days"
+      >
+        ρ<sub>occ</sub> {formatted}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-sm border border-border px-1.5 py-0.5 text-[10px] font-mono font-medium tabular-nums text-muted-foreground"
+      title="Conditional co-occurrence ρ: Pearson correlation on shared trading days only (removes zero-padding)"
+    >
+      ρ<sub>occ</sub> {formatted}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Pair context chips (deterministic — from pair_contexts, no LLM needed)
 // ---------------------------------------------------------------------------
 
@@ -210,14 +266,19 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
                 const ctxChips = pairCtx ? buildContextChips(pairCtx) : [];
                 return (
                   <div key={`${i}-${j}`} className="space-y-0.5">
-                    {/* Main row: names, badge, risk label — all inline */}
-                    <div className="flex items-center gap-2">
+                    {/* Main row: names, EWMA badge, co-occurrence badge, risk label */}
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-foreground">
                         {label(i)}{' '}
                         <span className="text-muted-foreground">↔</span>{' '}
                         {label(j)}
                       </span>
+                      {/* EWMA correlation — portfolio risk metric (sparse series) */}
                       <CorrBadge corr={corr} />
+                      {/* Co-occurrence ρ — Pearson on shared trading days only, more interpretable */}
+                      {pairCtx?.co_occurrence_correlation != null && (
+                        <CoOccBadge rho={pairCtx.co_occurrence_correlation} />
+                      )}
                       {corr >= HIGH_CORR_THRESHOLD && (
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">
                           Co-movement risk

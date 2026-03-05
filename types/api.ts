@@ -161,6 +161,12 @@ export interface CorrelationPairContext {
   /** Mode of Regime int at trade entry: 0=LOW_VOL 1=NORMAL 2=ELEVATED_VOL 3=CRISIS */
   primary_entry_regime_a: number;
   primary_entry_regime_b: number;
+  /**
+   * Pearson ρ computed ONLY on shared exit dates (removes EWMA zero-padding suppression).
+   * Directly answers: "when both bots trade, how correlated are their P&L outcomes?"
+   * Ranges −1 to +1. null when fewer than 3 shared exit dates or constant P&L series.
+   */
+  co_occurrence_correlation?: number | null;
 }
 
 /** Single pair entry within CorrelationInsightResponse */
