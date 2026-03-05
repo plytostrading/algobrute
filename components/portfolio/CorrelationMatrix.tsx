@@ -140,6 +140,65 @@ function CoOccBadge({ rho }: { rho: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// Market exposure badge (structural asset-level price correlation)
+// ---------------------------------------------------------------------------
+
+/**
+ * Displays the structural market-exposure score — the Pearson correlation of
+ * the daily price returns of the two underlying assets over the past year.
+ *
+ * Unlike the behavioral badges above (which are derived from closed-trade
+ * outcomes), this measures whether the same macro events would hit both assets
+ * at the same time — even when neither bot has any trades closing that day.
+ *
+ * Labeled "market exposure" so a non-quant reader understands: "how much do
+ * the underlying assets move together in the market?"
+ *
+ * High amber (≥ 0.7): same macro forces hit both assets simultaneously.
+ * Negative green (≤ −0.35): assets move opposite — structural hedge.
+ */
+function MarketExpBadge({ rho }: { rho: number }) {
+  const formatted = rho.toFixed(2);
+  const tooltip =
+    'Price correlation of the underlying assets over the past year. '
+    + 'High values mean the same macro events (rate changes, sector selloffs) '
+    + "would hit both bots' open positions at the same time, "
+    + 'even when neither has trades closing that day.';
+
+  if (rho >= 0.7) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-sm border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-400"
+        title={tooltip}
+      >
+        <span className="font-normal opacity-70">market exposure</span>
+        {formatted}
+      </span>
+    );
+  }
+  if (rho <= -0.35) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-sm border border-emerald-500/50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-400"
+        title={tooltip}
+      >
+        <span className="font-normal opacity-70">market exposure</span>
+        {formatted}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-sm border border-border px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
+      title={tooltip}
+    >
+      <span className="opacity-60">market exposure</span>
+      {formatted}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Pair context chips (deterministic — from pair_contexts, no LLM needed)
 // ---------------------------------------------------------------------------
 
@@ -309,6 +368,10 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
                       {/* "When trading" score — how similar their results are on shared active days */}
                       {pairCtx?.co_occurrence_correlation != null && (
                         <CoOccBadge rho={pairCtx.co_occurrence_correlation} />
+                      )}
+                      {/* Market exposure — structural price correlation of the underlying assets */}
+                      {pairCtx?.ticker_price_correlation != null && (
+                        <MarketExpBadge rho={pairCtx.ticker_price_correlation} />
                       )}
                       {corr >= HIGH_CORR_THRESHOLD && (
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">

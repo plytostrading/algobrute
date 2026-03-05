@@ -167,6 +167,14 @@ export interface CorrelationPairContext {
    * Ranges −1 to +1. null when fewer than 3 shared exit dates or constant P&L series.
    */
   co_occurrence_correlation?: number | null;
+  /**
+   * Pearson ρ of daily price returns of the underlying assets over the past ~252 trading days.
+   * Structural market exposure: whether macro events (rate changes, sector rotations) move both
+   * assets simultaneously — even when neither bot has trades closing that day.
+   * +1 = lockstep, 0 = independent, −1 = structural hedge.
+   * null when Polygon data unavailable or < 30 shared price days.
+   */
+  ticker_price_correlation?: number | null;
 }
 
 /** Single pair entry within CorrelationInsightResponse */
