@@ -125,6 +125,26 @@ export interface CorrelatedPair {
   correlation: number;
 }
 
+/** Single pair entry within CorrelationInsightResponse */
+export interface CorrelationPairInsight {
+  bot_a: string;
+  bot_b: string;
+  /** 1-2 sentence LLM analysis of why these bots are correlated. */
+  insight: string;
+  /** Short list of quantitative/qualitative factors driving the correlation value. */
+  drivers: string[];
+}
+
+/** GET /api/fleet/correlation/{regime}/insight */
+export interface CorrelationInsightResponse {
+  regime: Regime;
+  headline: string;
+  summary: string;
+  severity: string;
+  action: string;
+  pair_insights: CorrelationPairInsight[];
+}
+
 /** GET /api/fleet/correlation/{regime} */
 export interface CorrelationAnalysis {
   regime: Regime;

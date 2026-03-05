@@ -20,7 +20,8 @@ import { AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleetCorrelation } from '@/hooks/useFleetCorrelation';
-import type { Regime } from '@/types/api';
+import { useFleetCorrelationInsight } from '@/hooks/useFleetCorrelationInsight';
+import type { CorrelationPairInsight, Regime } from '@/types/api';
 
 const HIGH_CORR_THRESHOLD = 0.6;
 
@@ -68,6 +69,10 @@ interface CorrelationMatrixProps {
 
 export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatrixProps) {
   const { data, isLoading, isError } = useFleetCorrelation(initialRegime);
+  const {
+    data: insight,
+    isLoading: insightLoading,
+  } = useFleetCorrelationInsight(initialRegime);
 
   const n = data?.n_bots ?? 0;
   const botNames = data?.bot_names ?? [];
@@ -90,6 +95,19 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
 
   const highCorrPairs = pairs.filter((p) => p.corr >= HIGH_CORR_THRESHOLD);
 
+  /**
+   * Look up the LLM insight for a specific bot pair.
+   * Matches on both orderings since the LLM may return them in either order.
+   */
+  const getPairInsight = (nameA: string, nameB: string): CorrelationPairInsight | undefined => {
+    if (!insight?.pair_insights) return undefined;
+    return insight.pair_insights.find(
+      (p) =>
+        (p.bot_a === nameA && p.bot_b === nameB) ||
+        (p.bot_a === nameB && p.bot_b === nameA),
+    );
+  };
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -99,7 +117,7 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* Loading skeletons */}
+        {/* Loading skeletons for correlation data */}
         {isLoading && (
           <div className="space-y-2">
             <Skeleton className="h-5 w-full" />
@@ -120,42 +138,92 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
 
         {!isLoading && !isError && data && n >= 2 && (
           <>
-            {/* One row per unique pair — all content on a single line */}
-            <div className="space-y-2">
-              {pairs.map(({ i, j, corr }) => (
-                <div key={`${i}-${j}`} className="flex items-center gap-2">
-                  <span className="text-xs text-foreground">
-                    {label(i)}{' '}
-                    <span className="text-muted-foreground">↔</span>{' '}
-                    {label(j)}
-                  </span>
-                  <CorrBadge corr={corr} />
-                  {corr >= HIGH_CORR_THRESHOLD && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">
-                      Co-movement risk
-                    </span>
-                  )}
-                </div>
-              ))}
+            {/* Fleet-level LLM headline when available */}
+            {insight?.headline && (
+              <p className="text-xs text-foreground font-medium">{insight.headline}</p>
+            )}
+
+            {/* Per-pair rows — badge + risk label on first line; insight + drivers below */}
+            <div className="space-y-3">
+              {pairs.map(({ i, j, corr }) => {
+                const pairInsight = getPairInsight(botNames[i], botNames[j]);
+                return (
+                  <div key={`${i}-${j}`} className="space-y-0.5">
+                    {/* Main row: names, badge, risk label — all inline */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-foreground">
+                        {label(i)}{' '}
+                        <span className="text-muted-foreground">↔</span>{' '}
+                        {label(j)}
+                      </span>
+                      <CorrBadge corr={corr} />
+                      {corr >= HIGH_CORR_THRESHOLD && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">
+                          Co-movement risk
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Insight sub-line: LLM explanation or loading skeleton */}
+                    {insightLoading && (
+                      <Skeleton className="h-3 w-4/5 ml-0.5" />
+                    )}
+                    {!insightLoading && pairInsight?.insight && (
+                      <p className="text-[11px] text-muted-foreground leading-snug ml-0.5">
+                        {pairInsight.insight}
+                      </p>
+                    )}
+
+                    {/* Driver chips: small pill tags for quantitative/qualitative factors */}
+                    {!insightLoading && pairInsight?.drivers && pairInsight.drivers.length > 0 && (
+                      <div className="flex flex-wrap gap-1 ml-0.5 mt-0.5">
+                        {pairInsight.drivers.map((driver, di) => (
+                          <span
+                            key={di}
+                            className="inline-flex items-center rounded-sm bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground border border-border"
+                          >
+                            {driver}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Plain-language insight box for high-correlation pairs */}
+            {/* Fleet-level action from LLM (shown when available and non-trivial) */}
+            {insight?.action && (
+              <p className="text-[11px] text-muted-foreground border-t pt-2 leading-snug">
+                <span className="font-semibold text-foreground">Recommended action: </span>
+                {insight.action}
+              </p>
+            )}
+
+            {/* Amber warning box for high-correlation pairs — uses LLM summary when available,
+                falls back to deterministic text */}
             {highCorrPairs.length > 0 && (
               <div className="flex gap-2.5 rounded border border-amber-500/40 bg-amber-500/10 p-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <div className="space-y-1">
-                  {highCorrPairs.map(({ i, j, corr }) => (
-                    <p
-                      key={`warn-${i}-${j}`}
-                      className="text-xs leading-snug text-amber-700 dark:text-amber-300"
-                    >
-                      <span className="font-semibold">{botNames[i]}</span> and{' '}
-                      <span className="font-semibold">{botNames[j]}</span> bots have{' '}
-                      <span className="font-mono font-bold">{corr.toFixed(2)}</span> correlation
-                      — a broad equity selloff would hit both simultaneously. Consider adding
-                      uncorrelated strategies (commodities, FX) to reduce co-movement risk.
+                  {insight?.summary ? (
+                    <p className="text-xs leading-snug text-amber-700 dark:text-amber-300">
+                      {insight.summary}
                     </p>
-                  ))}
+                  ) : (
+                    highCorrPairs.map(({ i, j, corr }) => (
+                      <p
+                        key={`warn-${i}-${j}`}
+                        className="text-xs leading-snug text-amber-700 dark:text-amber-300"
+                      >
+                        <span className="font-semibold">{botNames[i]}</span> and{' '}
+                        <span className="font-semibold">{botNames[j]}</span> bots have{' '}
+                        <span className="font-mono font-bold">{corr.toFixed(2)}</span> correlation
+                        — a broad equity selloff would hit both simultaneously. Consider adding
+                        uncorrelated strategies (commodities, FX) to reduce co-movement risk.
+                      </p>
+                    ))
+                  )}
                 </div>
               </div>
             )}

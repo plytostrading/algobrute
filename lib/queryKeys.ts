@@ -28,6 +28,7 @@ export const queryKeys = {
     state: ['fleet', 'state'] as const,
     var: ['fleet', 'var'] as const,
     correlation: (regime: number) => ['fleet', 'correlation', regime] as const,
+    correlationInsight: (regime: number) => ['fleet', 'correlation', regime, 'insight'] as const,
     benchmark: (ticker: string) => ['fleet', 'benchmark', ticker] as const,
     portfolioContribution: ['fleet', 'portfolio-contribution'] as const,
   },
