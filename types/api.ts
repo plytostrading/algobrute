@@ -131,6 +131,8 @@ export interface CorrelationAnalysis {
   matrix_values: number[];
   n_bots: number;
   bot_names: string[];
+  /** Ticker symbol for each bot, aligned with bot_names. Empty string when unknown. */
+  bot_tickers: string[];
   n_days_used: number;
   source: string;
   max_pairwise_correlation: number;
@@ -174,6 +176,50 @@ export interface FleetRiskAttribution {
   concentration_alert: boolean;
   most_risk_efficient: string;
   least_risk_efficient: string;
+}
+
+// ---------------------------------------------------------------------------
+// Fleet portfolio contribution (F3)
+// ---------------------------------------------------------------------------
+
+/** Per-regime P&L breakdown for a single bot or the fleet. */
+export interface RegimePnLBreakdown {
+  regime: Regime;
+  regime_name: string;
+  realized_pnl: number;
+  trade_count: number;
+  /** Fraction 0–1 */
+  win_rate: number;
+  avg_return_pct: number;
+}
+
+/** Per-bot portfolio contribution: capital, P&L, risk, and regime breakdown. */
+export interface BotPortfolioContribution {
+  bot_id: string;
+  strategy_name: string;
+  ticker: string;
+  capital_allocation: number;
+  capital_allocation_pct: number;
+  realized_pnl: number;
+  /** This bot's realized P&L as % of total fleet P&L */
+  realized_pnl_pct_of_fleet: number;
+  risk_contribution_pct: number;
+  standalone_volatility: number;
+  risk_efficiency: number;
+  var_contribution_pct: number;
+  regime_pnl: RegimePnLBreakdown[];
+}
+
+/** GET /api/fleet/portfolio-contribution */
+export interface FleetPortfolioContribution {
+  user_id: string;
+  regime: Regime;
+  total_capital: number;
+  total_realized_pnl: number;
+  /** Sorted by capital_allocation_pct descending */
+  bot_contributions: BotPortfolioContribution[];
+  fleet_regime_pnl: RegimePnLBreakdown[];
+  computed_at: string;
 }
 
 // ---------------------------------------------------------------------------

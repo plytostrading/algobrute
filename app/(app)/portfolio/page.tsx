@@ -6,6 +6,8 @@ import PortfolioHero from '@/components/portfolio/PortfolioHero';
 import PortfolioChart from '@/components/command-center/PortfolioChart';
 import TopRecommendationPreview from '@/components/command-center/TopRecommendationPreview';
 import BotAllocationGrid from '@/components/portfolio/BotAllocationGrid';
+import CorrelationMatrix from '@/components/portfolio/CorrelationMatrix';
+import PortfolioContributionPanel from '@/components/portfolio/PortfolioContributionPanel';
 import { useFleetWeather, useFleetWeatherHistory } from '@/hooks/useFleetWeather';
 import { useFleetState } from '@/hooks/useFleetState';
 import { useFleetRecommendations } from '@/hooks/useFleetRecommendations';
@@ -65,6 +67,12 @@ export default function PortfolioPage() {
 
       {/* Per-bot holdings with expandable Strategy DNA */}
       <BotAllocationGrid fleetState={fleetState} />
+
+      {/* F3 — Portfolio contribution: capital, P&L, risk, and regime attribution */}
+      <PortfolioContributionPanel />
+
+      {/* F1 — Regime-conditioned pairwise correlation heatmap */}
+      <CorrelationMatrix initialRegime={weather.current_regime} />
     </div>
   );
 }
