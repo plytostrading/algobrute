@@ -3,55 +3,26 @@
 /**
  * CorrelationMatrix
  *
- * Renders an NxN EWMA correlation heatmap for the fleet, with regime selector
- * tabs to switch between LOW_VOL / NORMAL / ELEVATED_VOL / CRISIS regimes.
+ * Shows pairwise EWMA correlation between all fleet bots for a selected regime.
+ * Each unique bot pair is displayed as a row with a colored correlation badge
+ * and a "CO-MOVEMENT RISK" label for highly-correlated pairs.  A plain-language
+ * warning box below the list explains the risk and suggests remediation.
  *
  * Data: GET /api/fleet/correlation/{regime}
- *
- * Design:
- *   - Blue → white → red color scale (−1 to +1)
- *   - Axis labels: "strategy (TICKER)" or "strategy" when ticker is empty
- *   - Diagonal cells (self-correlation = 1.0) shown in muted gray
- *   - Highly-correlated pairs listed below as amber warnings
- *   - Data quality footnote: EWMA half-life 60d + n_days_used
  */
 
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleetCorrelation } from '@/hooks/useFleetCorrelation';
-import { getRegimeLabel } from '@/lib/regimeLabel';
 import type { Regime } from '@/types/api';
 
 // ---------------------------------------------------------------------------
-// Color utilities
+// Constants
 // ---------------------------------------------------------------------------
 
-/** Map correlation [-1, +1] to CSS rgb(). Diagonal handled separately. */
-function corrToRgb(corr: number, isDiag: boolean): string {
-  if (isDiag) return 'hsl(var(--muted))';
-  const c = Math.max(-1, Math.min(1, corr));
-  if (c >= 0) {
-    // White → red
-    const v = Math.round(255 * (1 - c));
-    return `rgb(255, ${v}, ${v})`;
-  } else {
-    // White → blue
-    const v = Math.round(255 * (1 + c));
-    return `rgb(${v}, ${v}, 255)`;
-  }
-}
-
-/** Text color for contrast on correlation cell background. */
-function corrTextClass(corr: number, isDiag: boolean): string {
-  if (isDiag) return 'text-muted-foreground';
-  return Math.abs(corr) > 0.55 ? 'text-white font-semibold' : 'text-foreground';
-}
-
-// ---------------------------------------------------------------------------
-// Regime tab buttons
-// ---------------------------------------------------------------------------
+const HIGH_CORR_THRESHOLD = 0.6;
 
 const REGIMES: { value: Regime; label: string }[] = [
   { value: 0, label: 'Low Vol' },
@@ -61,11 +32,27 @@ const REGIMES: { value: Regime; label: string }[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Badge styling helpers
+// ---------------------------------------------------------------------------
+
+/** Returns Tailwind classes for the correlation value badge based on magnitude. */
+function corrBadgeClasses(corr: number): string {
+  if (corr >= HIGH_CORR_THRESHOLD)
+    return 'border border-red-500/50 bg-red-500/15 text-red-400 font-bold';
+  if (corr >= 0.35)
+    return 'border border-amber-500/50 bg-amber-500/15 text-amber-400 font-semibold';
+  if (corr >= 0)
+    return 'border border-border bg-muted/60 text-muted-foreground';
+  // Negative — blue tint
+  return 'border border-blue-500/30 bg-blue-500/10 text-blue-400';
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 interface CorrelationMatrixProps {
-  /** Pre-select a regime (e.g. the current market regime from weather). */
+  /** Pre-select a regime tab (e.g. current market regime from weather report). */
   initialRegime?: Regime;
 }
 
@@ -78,31 +65,40 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
   const botTickers = data?.bot_tickers ?? [];
   const matrixValues = data?.matrix_values ?? [];
 
-  /** Axis label: "strategy (TICKER)" or "strategy" if ticker absent */
-  const axisLabel = (i: number): string => {
-    const name = botNames[i] ?? '';
+  /** Display label: "strategy (TICKER)" or just "strategy" when ticker absent. */
+  const label = (i: number): string => {
     const ticker = botTickers[i] ?? '';
-    return ticker ? `${name} (${ticker})` : name;
+    return ticker ? `${botNames[i]} (${ticker})` : (botNames[i] ?? '');
   };
+
+  /**
+   * Build all unique upper-triangle pairs sorted by absolute correlation
+   * descending so the most concerning pairs appear first.
+   */
+  const pairs: { i: number; j: number; corr: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      pairs.push({ i, j, corr: matrixValues[i * n + j] ?? 0 });
+    }
+  }
+  pairs.sort((a, b) => Math.abs(b.corr) - Math.abs(a.corr));
+
+  const highCorrPairs = pairs.filter((p) => p.corr >= HIGH_CORR_THRESHOLD);
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <CardTitle className="text-base">Correlation Matrix</CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              Regime-conditioned EWMA pairwise correlation
-            </CardDescription>
-          </div>
-
-          {/* Regime selector */}
-          <div className="flex gap-1 flex-wrap">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+            Correlation Matrix
+          </CardTitle>
+          {/* Regime tabs */}
+          <div className="flex gap-1">
             {REGIMES.map((r) => (
               <button
                 key={r.value}
                 onClick={() => setSelectedRegime(r.value)}
-                className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${
+                className={`px-2 py-0.5 text-[11px] rounded font-medium transition-colors ${
                   selectedRegime === r.value
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -115,113 +111,89 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-3">
+        {/* Loading */}
         {isLoading && (
           <div className="space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-5/6" />
+            <Skeleton className="h-5 w-3/4" />
           </div>
         )}
 
+        {/* Error */}
         {isError && (
-          <p className="text-sm text-destructive">
-            Correlation data unavailable for {getRegimeLabel(selectedRegime)} regime.
-          </p>
+          <p className="text-sm text-destructive">Correlation data unavailable.</p>
         )}
 
-        {!isLoading && !isError && !data && (
-          <p className="text-sm text-muted-foreground py-6 text-center">
+        {/* Empty */}
+        {!isLoading && !isError && (!data || n < 2) && (
+          <p className="text-sm text-muted-foreground py-2">
             No correlation data for this regime yet. Analytics run hourly.
           </p>
         )}
 
-        {!isLoading && !isError && data && n > 0 && (
-          <div className="space-y-4">
-            {/* NxN heatmap */}
-            <div className="overflow-x-auto">
-              <table className="text-[10px] border-collapse">
-                <thead>
-                  <tr>
-                    {/* Empty corner cell */}
-                    <th className="w-20" />
-                    {Array.from({ length: n }, (_, j) => (
-                      <th
-                        key={j}
-                        className="pb-1 px-1 font-medium text-muted-foreground text-right max-w-[60px] truncate"
-                        title={axisLabel(j)}
+        {/* Pair list */}
+        {!isLoading && !isError && data && n >= 2 && (
+          <>
+            <div className="space-y-2">
+              {pairs.map(({ i, j, corr }) => {
+                const isHigh = corr >= HIGH_CORR_THRESHOLD;
+                return (
+                  <div
+                    key={`${i}-${j}`}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span className="text-xs text-foreground truncate">
+                      {label(i)}{' '}
+                      <span className="text-muted-foreground">→</span>{' '}
+                      {label(j)}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`text-[11px] px-1.5 py-0.5 rounded font-mono tabular-nums ${
+                          corrBadgeClasses(corr)
+                        }`}
                       >
-                        <span className="block truncate max-w-[60px]">{axisLabel(j)}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: n }, (_, i) => (
-                    <tr key={i}>
-                      {/* Row label */}
-                      <td
-                        className="pr-2 py-0.5 font-medium text-muted-foreground truncate max-w-[80px] text-right"
-                        title={axisLabel(i)}
-                      >
-                        <span className="block truncate max-w-[80px]">{axisLabel(i)}</span>
-                      </td>
-                      {/* Cells */}
-                      {Array.from({ length: n }, (_, j) => {
-                        const corr = matrixValues[i * n + j] ?? 0;
-                        const isDiag = i === j;
-                        return (
-                          <td key={j} className="p-0.5">
-                            <div
-                              className={`w-12 h-10 flex items-center justify-center rounded text-[10px] tabular-nums ${corrTextClass(corr, isDiag)}`}
-                              style={{ background: corrToRgb(corr, isDiag) }}
-                              title={
-                                isDiag
-                                  ? axisLabel(i)
-                                  : `${axisLabel(i)} ↔ ${axisLabel(j)}: ρ = ${corr.toFixed(2)}`
-                              }
-                            >
-                              {isDiag ? '—' : corr.toFixed(2)}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        {corr >= 0 ? '+' : ''}{corr.toFixed(2)}
+                      </span>
+                      {isHigh && (
+                        <span className="text-[10px] uppercase tracking-wide text-amber-500 font-semibold">
+                          Co-movement risk
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Highly correlated pairs */}
-            {data.highly_correlated_pairs.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  High-Correlation Pairs (ρ &gt; threshold)
-                </p>
-                {data.highly_correlated_pairs.map((pair, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-1.5"
-                  >
-                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                    <span className="text-xs text-amber-700 dark:text-amber-400">
-                      {pair.bot_a} ↔ {pair.bot_b}
-                      <span className="ml-2 font-mono font-semibold">
-                        ρ = {pair.correlation.toFixed(2)}
-                      </span>
-                    </span>
-                  </div>
-                ))}
+            {/* Plain-language warning for high-correlation pairs */}
+            {highCorrPairs.length > 0 && (
+              <div className="flex gap-2.5 rounded border border-amber-500/40 bg-amber-500/10 p-3">
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  {highCorrPairs.map(({ i, j, corr }) => (
+                    <p
+                      key={`warn-${i}-${j}`}
+                      className="text-xs text-amber-700 dark:text-amber-300 leading-snug"
+                    >
+                      <span className="font-semibold">{botNames[i]}</span> and{' '}
+                      <span className="font-semibold">{botNames[j]}</span> share a{' '}
+                      <span className="font-mono font-bold">{corr.toFixed(2)}</span> correlation
+                      — a broad selloff would hit both simultaneously. Consider adding
+                      uncorrelated strategies to reduce co-movement risk.
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Data quality footnote */}
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              Correlation estimated via EWMA (half-life 60d) with Ledoit-Wolf shrinkage over{' '}
-              <span className="font-semibold">{data.n_days_used}</span> shared trading days.
-              {' '}Source: {data.source}.
-              {' '}Sparse return series may compress pairwise estimates toward zero.
+            <p className="text-[10px] text-muted-foreground">
+              EWMA correlation · {data.n_days_used}d · {data.source}
             </p>
-          </div>
+          </>
         )}
       </CardContent>
     </Card>
