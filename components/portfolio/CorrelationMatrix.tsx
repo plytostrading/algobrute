@@ -3,15 +3,14 @@
 /**
  * CorrelationMatrix
  *
- * Shows pairwise EWMA correlation between all fleet bots for the current
- * market regime.  Each unique bot pair occupies a single line:
+ * Shows pairwise co-movement between all fleet bots for the current market
+ * regime.  Each unique bot pair occupies a single line with two score badges:
  *
- *   BotA ↔ BotB   [0.72]   CO-MOVEMENT RISK
+ *   BotA ↔ BotB   [sync · 0.72]   [when trading · 0.71]   HIGH CO-MOVEMENT
  *
- * High-correlation pairs (ρ ≥ 0.6) get a filled red badge; moderate pairs
- * (ρ ≥ 0.35) get an amber outlined badge; low / negative pairs get a neutral
- * outlined badge.  An amber insight box below the list provides plain-language
- * context for any high-correlation pairs.
+ * "sync" is the portfolio-level co-movement score (weighted by capital and
+ * recency).  "when trading" is the score computed only on days when BOTH bots
+ * had closing trades — a more direct read of shared outcome risk.
  *
  * Data: GET /api/fleet/correlation/{regime}
  */
@@ -26,16 +25,30 @@ import type { CorrelationPairContext, CorrelationPairInsight, Regime } from '@/t
 const HIGH_CORR_THRESHOLD = 0.6;
 
 // ---------------------------------------------------------------------------
-// Inline badge
+// Portfolio sync badge (fleet-level co-movement score)
 // ---------------------------------------------------------------------------
 
+/**
+ * Displays the portfolio-level co-movement score (EWMA Pearson correlation).
+ *
+ * Label "sync" is used instead of "correlation" or "ρ" for a non-quant
+ * audience.  The number tells you HOW MUCH the bots move together in the
+ * portfolio: 0 = independent, 1 = always win/lose together.
+ */
 function CorrBadge({ corr }: { corr: number }) {
   const formatted = corr.toFixed(2);
+  const tooltip =
+    'Portfolio sync score (0 to 1). Shows how often these two bots win and lose '
+    + 'at the same time across the whole portfolio, weighted by capital size and '
+    + 'recent trade activity. Higher = more shared risk.';
 
   if (corr >= HIGH_CORR_THRESHOLD) {
-    // Filled red pill — matches the screenshot style for dangerous correlation
     return (
-      <span className="inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white">
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white"
+        title={tooltip}
+      >
+        <span className="font-normal opacity-80">sync</span>
         {formatted}
       </span>
     );
@@ -43,72 +56,85 @@ function CorrBadge({ corr }: { corr: number }) {
 
   if (corr >= 0.35) {
     return (
-      <span className="inline-flex items-center justify-center rounded-full border border-amber-500/60 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-amber-400">
+      <span
+        className="inline-flex items-center gap-1 rounded-full border border-amber-500/60 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-amber-400"
+        title={tooltip}
+      >
+        <span className="font-normal opacity-70">sync</span>
         {formatted}
       </span>
     );
   }
 
-  // Low positive or negative — neutral outlined pill
   return (
-    <span className="inline-flex items-center justify-center rounded-full border border-border px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground"
+      title={tooltip}
+    >
+      <span className="opacity-60">sync</span>
       {formatted}
     </span>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Co-occurrence correlation badge (conditional ρ on shared trading days)
+// "When trading" badge (co-occurrence score on shared active days)
 // ---------------------------------------------------------------------------
 
 /**
- * Displays the conditional co-occurrence correlation — Pearson ρ computed only
- * on the shared exit dates where both bots had closed trades.
+ * Displays the co-occurrence score — the similarity of outcomes specifically
+ * on days when BOTH bots have closing trades.
  *
- * This is more interpretable than the EWMA badge because it removes the
- * zero-padding suppression: you're reading the correlation of actual trading
- * outcomes, not a sparse time series.
+ * Labeled "when trading" instead of "ρ_occ" or "conditional correlation" so
+ * that a non-quant reader immediately understands what this number represents:
+ * "on the days both bots were active, how often did they win and lose together?"
+ *
+ * Negative values (green) signal a natural hedge — the bots tend to offset
+ * each other's losses on shared trading days.
  */
 function CoOccBadge({ rho }: { rho: number }) {
   const formatted = rho.toFixed(2);
-  // Use same thresholds as CorrBadge for visual consistency
+
   if (rho >= HIGH_CORR_THRESHOLD) {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-sm border border-red-500/60 px-1.5 py-0.5 text-[10px] font-mono font-semibold tabular-nums text-red-400"
-        title="Conditional co-occurrence ρ: Pearson correlation on shared trading days only (removes zero-padding)"
+        className="inline-flex items-center gap-1 rounded-sm border border-red-500/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-red-400"
+        title="When both bots have trades closing on the same day, this is how similar their results are. High values mean they tend to win and lose together — a shared drawdown risk."
       >
-        ρ<sub>occ</sub> {formatted}
+        <span className="font-normal opacity-70">when trading</span>
+        {formatted}
       </span>
     );
   }
   if (rho >= 0.35) {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-sm border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-mono font-semibold tabular-nums text-amber-500/80"
-        title="Conditional co-occurrence ρ: Pearson correlation on shared trading days only (removes zero-padding)"
+        className="inline-flex items-center gap-1 rounded-sm border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-500/80"
+        title="When both bots have trades closing on the same day, this is how similar their results are."
       >
-        ρ<sub>occ</sub> {formatted}
+        <span className="font-normal opacity-70">when trading</span>
+        {formatted}
       </span>
     );
   }
   if (rho <= -0.35) {
-    // Negative correlation — potential natural hedge
     return (
       <span
-        className="inline-flex items-center justify-center rounded-sm border border-emerald-500/50 px-1.5 py-0.5 text-[10px] font-mono font-semibold tabular-nums text-emerald-400"
-        title="Conditional co-occurrence ρ: negative — bots tend to offset each other on shared trading days"
+        className="inline-flex items-center gap-1 rounded-sm border border-emerald-500/50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-400"
+        title="These bots tend to move in opposite directions on shared trading days — they partially offset each other, which cushions combined drawdowns."
       >
-        ρ<sub>occ</sub> {formatted}
+        <span className="font-normal opacity-70">when trading</span>
+        {formatted}
       </span>
     );
   }
   return (
     <span
-      className="inline-flex items-center justify-center rounded-sm border border-border px-1.5 py-0.5 text-[10px] font-mono font-medium tabular-nums text-muted-foreground"
-      title="Conditional co-occurrence ρ: Pearson correlation on shared trading days only (removes zero-padding)"
+      className="inline-flex items-center gap-1 rounded-sm border border-border px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
+      title="When both bots have trades closing on the same day, this is how similar their results are. Values near 0 mean their outcomes are mostly independent."
     >
-      ρ<sub>occ</sub> {formatted}
+      <span className="opacity-60">when trading</span>
+      {formatted}
     </span>
   );
 }
@@ -126,35 +152,40 @@ function CoOccBadge({ rho }: { rho: number }) {
 function buildContextChips(ctx: CorrelationPairContext): string[] {
   const chips: string[] = [];
 
-  // Trade timing overlap
+  // How often do they trade on the same day?
   if (ctx.n_shared_exit_dates > 0) {
-    chips.push(`${Math.round(ctx.date_overlap_pct * 100)}% date overlap (${ctx.n_shared_exit_dates}d)`);
-    chips.push(`${Math.round(ctx.win_loss_cosign_rate * 100)}% win/loss sync`);
+    const overlapPct = Math.round(ctx.date_overlap_pct * 100);
+    chips.push(`${overlapPct}% of exit days overlap (${ctx.n_shared_exit_dates} shared days)`);
+    // On those shared days, how often do they win/lose together?
+    const samePct = Math.round(ctx.win_loss_cosign_rate * 100);
+    chips.push(`same outcome ${samePct}% of shared days`);
   } else {
-    chips.push('No shared exit dates');
+    chips.push('never trade on the same day');
   }
 
-  // Directional bias
+  // Which direction do they bet?
   const bothLong = ctx.long_pct_a >= 0.8 && ctx.long_pct_b >= 0.8;
   const bothShort = ctx.long_pct_a <= 0.2 && ctx.long_pct_b <= 0.2;
   if (bothLong) {
-    chips.push('Both LONG-biased');
+    chips.push('both bet long — same market exposure');
   } else if (bothShort) {
-    chips.push('Both SHORT-biased');
+    chips.push('both bet short — same market exposure');
   } else {
-    chips.push(`${Math.round(ctx.long_pct_a * 100)}% / ${Math.round(ctx.long_pct_b * 100)}% long`);
+    chips.push(
+      `${Math.round(ctx.long_pct_a * 100)}% long vs ${Math.round(ctx.long_pct_b * 100)}% long`,
+    );
   }
 
-  // Capital concentration
-  chips.push(`${ctx.combined_capital_pct.toFixed(1)}% fleet capital`);
+  // How much of the portfolio do they represent together?
+  chips.push(`${ctx.combined_capital_pct.toFixed(1)}% of portfolio capital combined`);
 
-  // Holding-period proximity
+  // How long do they hold trades?
   const holdA = Math.round(ctx.avg_holding_bars_a);
   const holdB = Math.round(ctx.avg_holding_bars_b);
   if (Math.abs(holdA - holdB) <= 2) {
-    chips.push(`~${Math.round((holdA + holdB) / 2)}d avg hold`);
+    chips.push(`both hold ~${Math.round((holdA + holdB) / 2)} days per trade`);
   } else {
-    chips.push(`${holdA}d vs ${holdB}d hold`);
+    chips.push(`hold ${holdA} days vs ${holdB} days per trade`);
   }
 
   return chips;
@@ -273,9 +304,9 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
                         <span className="text-muted-foreground">↔</span>{' '}
                         {label(j)}
                       </span>
-                      {/* EWMA correlation — portfolio risk metric (sparse series) */}
+                      {/* Portfolio sync score — how much they co-move across the whole portfolio */}
                       <CorrBadge corr={corr} />
-                      {/* Co-occurrence ρ — Pearson on shared trading days only, more interpretable */}
+                      {/* "When trading" score — how similar their results are on shared active days */}
                       {pairCtx?.co_occurrence_correlation != null && (
                         <CoOccBadge rho={pairCtx.co_occurrence_correlation} />
                       )}
@@ -296,10 +327,8 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
                       </p>
                     )}
 
-                    {/* Factual context chips: deterministic, always available when live trades exist.
-                        These are the measured evidence that explains the correlation value —
-                        no LLM speculation. The correlation measures co-movement of realized
-                        P&L returns indexed by exit date, not price correlation. */}
+                    {/* Context chips: deterministic facts from trade history.
+                        Always visible when live trade data exists — no LLM needed. */}
                     {ctxChips.length > 0 && (
                       <div className="flex flex-wrap gap-1 ml-0.5 mt-0.5">
                         {ctxChips.map((chip, ci) => (
@@ -342,10 +371,11 @@ export default function CorrelationMatrix({ initialRegime = 1 }: CorrelationMatr
                         className="text-xs leading-snug text-amber-700 dark:text-amber-300"
                       >
                         <span className="font-semibold">{botNames[i]}</span> and{' '}
-                        <span className="font-semibold">{botNames[j]}</span> bots have{' '}
-                        <span className="font-mono font-bold">{corr.toFixed(2)}</span> correlation
-                        — a broad equity selloff would hit both simultaneously. Consider adding
-                        uncorrelated strategies (commodities, FX) to reduce co-movement risk.
+                        <span className="font-semibold">{botNames[j]}</span> tend to win and lose
+                        at the same time (sync score{' '}
+                        <span className="font-mono font-bold">{corr.toFixed(2)}</span>).
+                        A broad market drop would likely hit both bots together. Consider adding
+                        strategies that move differently to reduce shared risk.
                       </p>
                     ))
                   )}
