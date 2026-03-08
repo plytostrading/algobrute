@@ -114,6 +114,25 @@ export async function apiFetch(
 //   }
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// HttpError — an Error subclass that preserves the HTTP status code, enabling
+// callers (e.g. SectionInsightCard) to distinguish between failure modes
+// rather than treating all errors identically.
+//
+// Usage:
+//   throw new HttpError(res.status, detail);
+//   if (error instanceof HttpError && error.status === 503) { ... }
+// ---------------------------------------------------------------------------
+
+export class HttpError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+}
+
 export async function parseApiError(
   res: Response,
   fallback: string,

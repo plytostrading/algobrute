@@ -2,15 +2,18 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FlaskConical, Rocket, Search } from 'lucide-react';
+import { ActivitySquare, FlaskConical, Rocket, Search } from 'lucide-react';
 import BuildTab from '@/components/workbench/build/BuildTab';
+import TradeSimulationTab from '@/components/workbench/build/TradeSimulationTab';
 import DeployTab from '@/components/workbench/deploy/DeployTab';
 import DiscoverTab from '@/components/workbench/discover/DiscoverTab';
 import BacktestJobQueue from '@/components/workbench/BacktestJobQueue';
 import { useBacktestBackground } from '@/hooks/useBacktestBackground';
 
 export default function WorkbenchPage() {
-  const [activeTab, setActiveTab] = useState<'discover' | 'build' | 'deploy'>('build');
+  const [activeTab, setActiveTab] = useState<'discover' | 'build' | 'simulation' | 'deploy'>(
+    'build',
+  );
   const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
 
   // Restore the most recent background job from localStorage so navigating
@@ -36,6 +39,10 @@ export default function WorkbenchPage() {
           <TabsTrigger value="build" className="gap-2">
             <FlaskConical className="h-4 w-4" />
             Build & Test
+          </TabsTrigger>
+          <TabsTrigger value="simulation" className="gap-2">
+            <ActivitySquare className="h-4 w-4" />
+            Trade Simulation
           </TabsTrigger>
           <TabsTrigger value="deploy" className="gap-2">
             <Rocket className="h-4 w-4" />
@@ -65,6 +72,14 @@ export default function WorkbenchPage() {
               setActiveJobId(null);
               setSelectedStrategyId(null);
             }}
+          />
+        </TabsContent>
+
+        <TabsContent value="simulation" className="mt-6">
+          <TradeSimulationTab
+            activeJobId={activeJobId}
+            onActiveJobChange={setActiveJobId}
+            onStrategyChange={setSelectedStrategyId}
           />
         </TabsContent>
 

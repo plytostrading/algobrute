@@ -48,9 +48,12 @@ else
   (
     cd "$BACKEND_DIR"
     python3 - <<'PYEOF' &
-import subprocess, sys
+import os, subprocess, sys
 from dotenv import load_dotenv
-load_dotenv(override=True)
+load_dotenv("/media/smalik/data/github/algobrute-engine/.env", override=True)
+src_path = "/media/smalik/data/github/algobrute-engine/src"
+existing = os.environ.get("PYTHONPATH")
+os.environ["PYTHONPATH"] = f"{src_path}:{existing}" if existing else src_path
 result = subprocess.run([
     sys.executable, "-m", "uvicorn", "algobrute.api.run:app",
     "--host", "0.0.0.0",

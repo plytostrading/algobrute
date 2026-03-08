@@ -3,7 +3,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, parseApiError, parseApiJson } from '@/lib/api';
 import { pollingIntervals, queryKeys } from '@/lib/queryKeys';
-import type { BotSnapshot, BotConfig, BotCreateRequest } from '@/types/api';
+import type {
+  BotSnapshot,
+  BotConfig,
+  BotCreateRequest,
+  BotDeployRequest,
+} from '@/types/api';
 
 type BotUpdatePayload = {
   botId: string;
@@ -51,6 +56,30 @@ export function useUpdateBot() {
           res,
           `Failed to update bot (${res.status})`,
         );
+        throw new Error(detail);
+      }
+      return parseApiJson<BotConfig>(res);
+    },
+    onSuccess: () => {
+      invalidateAfterBotMutation(queryClient);
+    },
+  });
+}
+
+/**
+ * Create and activate a passport-backed trading deployment.
+ */
+export function useDeployBot() {
+  const queryClient = useQueryClient();
+  return useMutation<BotConfig, Error, BotDeployRequest>({
+    mutationFn: async (req) => {
+      const res = await apiFetch('/api/bots/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req),
+      });
+      if (!res.ok) {
+        const detail = await parseApiError(res, 'Failed to deploy bot');
         throw new Error(detail);
       }
       return parseApiJson<BotConfig>(res);

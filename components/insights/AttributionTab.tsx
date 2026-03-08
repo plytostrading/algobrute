@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 import { useBacktestExport } from '@/hooks/useBacktestWorkflow';
 import SectionInsightCard from '@/components/insights/SectionInsightCard';
@@ -52,36 +52,6 @@ interface AttributionTabProps {
 
 export default function AttributionTab({ jobId }: AttributionTabProps) {
   const { data: report, isLoading, isError, error } = useBacktestExport(jobId, !!jobId);
-
-  if (!jobId) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
-          <p className="text-sm text-muted-foreground">Select a completed backtest above to view attribution.</p>
-          <Link href="/workbench" className="text-xs text-primary underline-offset-4 hover:underline">
-            Run a backtest in the Workbench →
-          </Link>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <p className="text-sm text-destructive">{error?.message ?? 'Failed to load attribution data.'}</p>
-          <p className="text-xs text-muted-foreground">
-            Choose another completed backtest or rerun this one to regenerate attribution outputs.
-          </p>
-          <Link href="/workbench" className="text-xs text-primary underline-offset-4 hover:underline">
-            Open Workbench →
-          </Link>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const passport = report?.passport;
   const cpcv = report?.cpcv_analysis;
   const bootstrap = report?.bootstrap_analysis;
@@ -114,26 +84,37 @@ export default function AttributionTab({ jobId }: AttributionTabProps) {
     ];
   }, [passport, cpcv, bootstrap, report]);
 
-  // ── Per-regime multi-series radar ─────────────────────────────────────────
-  // 4 axes: Win Rate, Avg Return (tanh-normalised), Anti-Drawdown, Kelly.
-  // Each regime is a separate Radar series overlaid on the same chart.
+  if (!jobId) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
+          <p className="text-sm text-muted-foreground">Select a completed backtest above to view attribution.</p>
+          <Link href="/workbench" className="text-xs text-primary underline-offset-4 hover:underline">
+            Run a backtest in the Workbench →
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <p className="text-sm text-destructive">{error?.message ?? 'Failed to load attribution data.'}</p>
+          <p className="text-xs text-muted-foreground">
+            Choose another completed backtest or rerun this one to regenerate attribution outputs.
+          </p>
+          <Link href="/workbench" className="text-xs text-primary underline-offset-4 hover:underline">
+            Open Workbench →
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Per-regime individual radars — no data prep needed; built inline per regime
   const riskRules = report?.risk_rules_by_regime;
-  const regimeRadarAxes = ['Win Rate', 'Avg Return', 'Anti-DD', 'Kelly'];
-  const regimeRadarData = useMemo(() => {
-    if (!riskRules || Object.keys(riskRules).length === 0) return null;
-    // Build rows where each row is one axis, and each regime is a column.
-    return regimeRadarAxes.map((axisLabel) => {
-      const row: Record<string, string | number> = { axis: axisLabel };
-      for (const [rName, rr] of Object.entries(riskRules)) {
-        const label = REGIME_NAMES[rName] ?? rName;
-        if (axisLabel === 'Win Rate')    row[label] = Math.round(rr.win_rate_in_regime * 100);
-        if (axisLabel === 'Avg Return')  row[label] = normalizeAvgReturn(rr.avg_return_in_regime);
-        if (axisLabel === 'Anti-DD')     row[label] = normalizeAntiDrawdown(rr.max_drawdown_in_regime);
-        if (axisLabel === 'Kelly')       row[label] = Math.min(100, Math.round(rr.kelly_fraction * 4 * 100));
-      }
-      return row;
-    });
-  }, [riskRules]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Per-regime performance table ──────────────────────────────────────────
   type RegimeRow = Record<string, number | boolean | string>;
@@ -147,12 +128,6 @@ export default function AttributionTab({ jobId }: AttributionTabProps) {
     sharpe: typeof r.sharpe === 'number' ? parseFloat((r.sharpe as number).toFixed(2)) : null,
     n_trades: typeof r.n_trades === 'number' ? r.n_trades : null,
   }));
-
-  // Regime keys for iterating per-regime radar series
-  const regimeSeriesKeys = useMemo(() => {
-    if (!riskRules) return [];
-    return Object.keys(riskRules).map((k) => REGIME_NAMES[k] ?? k);
-  }, [riskRules]);
 
   const tooltipStyle = {
     backgroundColor: 'var(--color-popover)',
@@ -174,7 +149,13 @@ export default function AttributionTab({ jobId }: AttributionTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SectionInsightCard jobId={jobId} sectionKey="skill_vs_luck" className="mb-4" />
+          {/* Only show the insight card when CPCV or passport data is present —
+              the payload builder returns an empty dict if both are absent,
+              which would cause the backend to 404 and the card to show
+              an error indicator instead of meaningful content. */}
+          {(cpcv != null || passport != null) && (
+            <SectionInsightCard jobId={jobId} sectionKey="skill_vs_luck" className="mb-4" />
+          )}
           {isLoading ? (
             <Skeleton className="h-[260px] w-full" />
           ) : overallRadarData ? (
@@ -203,7 +184,7 @@ export default function AttributionTab({ jobId }: AttributionTabProps) {
                     />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      formatter={(v: number, _: string) => [`${v}/100`, 'Score']}
+                      formatter={(v: number) => [`${v}/100`, 'Score']}
                     />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -229,61 +210,118 @@ export default function AttributionTab({ jobId }: AttributionTabProps) {
         </CardContent>
       </Card>
 
-      {/* Per-Regime Skill Decomposition Radar */}
-      {regimeRadarData && regimeSeriesKeys.length > 0 && (
+      {/* Per-Regime Skill Decomposition Radars — one chart per regime */}
+      {riskRules && Object.keys(riskRules).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Skill vs Luck — Per Regime</CardTitle>
             <CardDescription>
               Win Rate, Avg Return (tanh-normalised, 50=zero edge), Anti-Drawdown (100=no DD),
-              Kelly fraction (scaled 25%=100). Each regime is an overlaid polygon.
+              Kelly fraction (scaled 25%=100). One chart per regime for direct comparison.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
+            <SectionInsightCard jobId={jobId} sectionKey="skill_vs_luck_regime" />
             {isLoading ? (
-              <Skeleton className="h-[260px] w-full" />
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[200px] rounded-lg" />)}
+              </div>
             ) : (
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={regimeRadarData} margin={{ top: 10, right: 40, left: 40, bottom: 10 }}>
-                    <PolarGrid stroke="var(--color-border)" strokeOpacity={0.6} />
-                    <PolarAngleAxis
-                      dataKey="axis"
-                      tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                    />
-                    <PolarRadiusAxis
-                      angle={90}
-                      domain={[0, 100]}
-                      tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
-                      tickCount={4}
-                    />
-                    {regimeSeriesKeys.map((regime) => {
-                      // Map display name back to regime key for color lookup
-                      const colorKey = Object.entries(REGIME_NAMES).find(([, v]) => v === regime)?.[0] ?? regime;
-                      const color = REGIME_STRING_HEX[colorKey] ?? REGIME_STRING_HEX[regime] ?? '#94a3b8';
-                      return (
-                        <Radar
-                          key={regime}
-                          name={regime}
-                          dataKey={regime}
-                          stroke={color}
-                          fill={color}
-                          fillOpacity={0.12}
-                          strokeWidth={1.8}
-                        />
-                      );
-                    })}
-                    <Legend
-                      iconType="circle"
-                      iconSize={8}
-                      wrapperStyle={{ fontSize: '11px' }}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(v: number, name: string) => [`${v}/100`, name]}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                {Object.entries(riskRules).map(([regimeKey, rr]) => {
+                  const regimeName = REGIME_NAMES[regimeKey] ?? regimeKey;
+                  const color = REGIME_STRING_HEX[regimeKey] ?? REGIME_STRING_HEX[regimeName] ?? '#94a3b8';
+                  const singleRadarData = [
+                    { metric: 'Win Rate',   value: Math.round(rr.win_rate_in_regime * 100) },
+                    { metric: 'Avg Return', value: normalizeAvgReturn(rr.avg_return_in_regime) },
+                    { metric: 'Anti-DD',    value: normalizeAntiDrawdown(rr.max_drawdown_in_regime) },
+                    { metric: 'Kelly',      value: Math.min(100, Math.round(rr.kelly_fraction * 4 * 100)) },
+                  ];
+                  return (
+                    <div key={regimeKey} className="flex flex-col gap-1 rounded-md border p-2">
+                      <div className="flex items-center justify-between px-1">
+                        <p
+                          className="text-[10px] font-semibold uppercase tracking-wide"
+                          style={{ color }}
+                        >
+                          {regimeName}
+                        </p>
+                        <span className="text-[9px] text-muted-foreground">
+                          {rr.n_trades_in_regime} trades
+                        </span>
+                      </div>
+                      <div className="h-[180px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart
+                            data={singleRadarData}
+                            margin={{ top: 8, right: 20, left: 20, bottom: 8 }}
+                          >
+                            <PolarGrid stroke="var(--color-border)" strokeOpacity={0.5} />
+                            <PolarAngleAxis
+                              dataKey="metric"
+                              tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                            />
+                            <PolarRadiusAxis
+                              angle={90}
+                              domain={[0, 100]}
+                              tick={false}
+                              axisLine={false}
+                              tickCount={3}
+                            />
+                            <Radar
+                              name={regimeName}
+                              dataKey="value"
+                              stroke={color}
+                              fill={color}
+                              fillOpacity={0.18}
+                              strokeWidth={2}
+                            />
+                            <Tooltip
+                              contentStyle={tooltipStyle}
+                              formatter={(v: number) => [`${v}/100`, regimeName]}
+                            />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {/* Compact key metric summary */}
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 px-1 pb-1">
+                        <span className="text-[9px] text-muted-foreground">
+                          Win Rate{' '}
+                          <span className={`font-mono-data font-semibold ${
+                            rr.win_rate_in_regime >= 0.5 ? 'text-success' : 'text-destructive'
+                          }`}>
+                            {(rr.win_rate_in_regime * 100).toFixed(1)}%
+                          </span>
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          Kelly{' '}
+                          <span className="font-mono-data font-semibold">
+                            {(rr.kelly_fraction * 100).toFixed(1)}%
+                          </span>
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          Avg Ret{' '}
+                          <span className={`font-mono-data font-semibold ${
+                            rr.avg_return_in_regime >= 0 ? 'text-success' : 'text-destructive'
+                          }`}>
+                            {rr.avg_return_in_regime >= 0 ? '+' : ''}{rr.avg_return_in_regime.toFixed(2)}%
+                          </span>
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          Max DD{' '}
+                          <span className="font-mono-data font-semibold text-destructive">
+                            {(rr.max_drawdown_in_regime * 100).toFixed(1)}%
+                          </span>
+                        </span>
+                      </div>
+                      {rr.qualified ? (
+                        <span className="text-center text-[8px] font-semibold uppercase tracking-wide text-success">Qualified</span>
+                      ) : (
+                        <span className="text-center text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">Not Qualified</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>

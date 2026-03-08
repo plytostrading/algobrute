@@ -491,6 +491,172 @@ export interface StrategyDetail {
   regime_qualifications: Record<string, boolean>;
 }
 
+export interface ValidationSimulationWindow {
+  days: number;
+  discovery_end_date: string;
+  validation_start_date: string;
+  validation_end_date: string;
+}
+
+export interface ValidationSimulationQuestionRequest {
+  question: string;
+}
+export interface ValidationSimulationSectionInsight {
+  summary: string;
+  sentiment: 'positive' | 'neutral' | 'caution' | 'warning';
+  cached: boolean;
+}
+
+export interface ValidationSimulationQuestionAnswer {
+  headline: string;
+  explanation: string;
+  action: string;
+  severity: string;
+  additional_sections: Record<string, unknown>;
+  cached: boolean;
+}
+
+export interface ValidationSimulationRiskStateSnapshot {
+  qualification_active: boolean | null;
+  signal_strength: number | null;
+  kelly_fraction: number | null;
+  position_size_pct: number | null;
+  initial_stop_pct: number | null;
+  target_price: number | null;
+  trailing_stop_retracement_pct: number | null;
+  breakeven_trigger_pct: number | null;
+  circuit_breaker_active: boolean | null;
+  circuit_breaker_reason: string | null;
+  additional_state: Record<string, unknown>;
+}
+
+export interface ValidationSimulationTimelinePoint {
+  sequence_no: number;
+  event_type: string;
+  event_time: string | null;
+  trade_id: string | null;
+  ticker: string | null;
+  price: number | null;
+  payload: Record<string, unknown>;
+  risk_state: ValidationSimulationRiskStateSnapshot | null;
+}
+export interface ValidationSimulationRunResult {
+  run_id: string;
+  fill_policy: string;
+  n_events: number;
+  n_trades: number;
+  n_closed_trades: number;
+  realized_pnl: number;
+  realized_return_pct: number;
+  final_cash: number;
+  final_portfolio_value: number;
+  gross_exposure: number;
+  n_open_positions: number;
+  total_return_pct: number;
+}
+
+export interface ValidationSimulationTradeSummary {
+  trade_id: string;
+  ticker: string;
+  side: string;
+  entry_date: string;
+  exit_date: string | null;
+  entry_price: number;
+  exit_price: number | null;
+  quantity: number;
+  entry_regime: string;
+  exit_regime: string | null;
+  realized_pnl: number | null;
+  realized_pnl_pct: number | null;
+  mfe_pct: number | null;
+  mae_pct: number | null;
+  holding_bars: number | null;
+  exit_reason: string | null;
+  signal_strength: number | null;
+}
+
+export interface ValidationSimulationTradeMarker {
+  trade_id: string;
+  marker_type: string;
+  ticker: string;
+  side: string;
+  trade_date: string;
+  price: number | null;
+  realized_pnl_pct: number | null;
+}
+
+export interface ValidationSimulationRegimeTransitionSummary {
+  sequence_no: number;
+  event_time: string | null;
+  previous_regime: string | null;
+  new_regime: string | null;
+  conviction: string | null;
+}
+
+export interface ValidationSimulationDaySummary {
+  trade_date: string;
+  sequence_no: number;
+  event_time: string | null;
+  regime: string | null;
+  close_price: number | null;
+  cash: number | null;
+  portfolio_value: number | null;
+  gross_exposure: number | null;
+  n_open_positions: number | null;
+  risk_state: ValidationSimulationRiskStateSnapshot | null;
+}
+
+export interface ValidationSimulationTimeline {
+  run_id: string;
+  status: string;
+  result: ValidationSimulationRunResult | null;
+  latest_risk_state: ValidationSimulationRiskStateSnapshot | null;
+  timeline_points: ValidationSimulationTimelinePoint[];
+  trade_markers: ValidationSimulationTradeMarker[];
+  regime_transitions: ValidationSimulationRegimeTransitionSummary[];
+  day_summaries: ValidationSimulationDaySummary[];
+}
+
+export interface ValidationSimulationComparison {
+  run_id: string;
+  baseline_metrics: Record<string, unknown>;
+  validation_metrics: Record<string, unknown>;
+  headline_metrics: Record<string, unknown>;
+  metric_deltas: Record<string, unknown>;
+  narrative_drivers: Record<string, string>;
+}
+
+export interface ValidationSimulationRunSummary {
+  run_id: string;
+  backtest_job_id: string;
+  strategy_id: string;
+  ticker: string;
+  status: string;
+  validation_window: ValidationSimulationWindow;
+  progress_phase: string | null;
+  error_message: string | null;
+  content_hash: string;
+  timeline_available: boolean;
+  comparison_available: boolean;
+  latest_event_sequence: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ValidationSimulationOverview {
+  backtest_job_id: string;
+  strategy_id: string;
+  ticker: string;
+  validation_window: ValidationSimulationWindow | null;
+  validation_ready: boolean;
+  latest_run: ValidationSimulationRunSummary | null;
+}
+
+export interface ValidationSimulationRunList {
+  backtest_job_id: string;
+  runs: ValidationSimulationRunSummary[];
+}
+
 // ---------------------------------------------------------------------------
 // Trading
 // ---------------------------------------------------------------------------
@@ -532,6 +698,9 @@ export interface BacktestRequest {
   start_date: string;
   end_date: string;
   initial_capital: number;
+  /** Compute-budget profile. Defaults to 'standard' when omitted. */
+  profile?: 'standard' | 'thorough';
+  validation_simulation_days?: number;
 }
 
 /** POST /api/backtest/run response */
@@ -547,17 +716,25 @@ export interface JobStatus {
   /** Pipeline phase identifier — one of the PHASE_* constants from backtest_phases.py */
   progress_phase: string | null;
   error_message: string | null;
+  validation_window: ValidationSimulationWindow | null;
+  validation_ready: boolean;
 }
 
 /** GET /api/backtest/{id} — completed result (minimal) */
 export interface BacktestResult {
   job_id: string;
   strategy_id: string;
+  strategy_name?: string | null;
+  display_label?: string | null;
   sharpe_ratio: number | null;
   total_return_pct: number | null;
   max_drawdown_pct: number | null;
   n_trades: number;
   status: string;
+  validation_window: ValidationSimulationWindow | null;
+  validation_ready: boolean;
+  compute_wall_seconds?: number | null;
+  compute_cpu_seconds?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -638,6 +815,27 @@ export interface BacktestExportMonteCarlo {
   overall_p_value: number;
   significant_at_95pct: boolean;
   variants: Record<string, BacktestExportMCVariant>;
+}
+
+/**
+ * One point in the MC equity curve fan chart — GET /api/backtest/{id}/mc-fan.
+ *
+ * All equity values are normalized: 1.0 = initial capital.  Multiply by the
+ * job's initial_capital on the frontend to display in dollar terms.
+ * ``regime`` encodes the observed Regime IntEnum at this trade step (0=LOW_VOL,
+ * 1=NORMAL, 2=ELEVATED_VOL, 3=CRISIS).
+ */
+export interface EquityFanPoint {
+  trade_idx: number;  // 0-based trade sequence position
+  p1: number;         // 1st percentile of bootstrap equity distribution
+  p5: number;         // 5th percentile
+  p25: number;        // 25th percentile
+  p50: number;        // 50th percentile (median)
+  p75: number;        // 75th percentile
+  p95: number;        // 95th percentile
+  p99: number;        // 99th percentile
+  observed: number;   // actual strategy cumulative equity (normalized)
+  regime: number;     // observed Regime IntEnum at this step
 }
 
 export interface BacktestExportBootstrap {
@@ -765,6 +963,12 @@ export interface BacktestExportRegimeRiskRules {
   prior_payoff_beta_param: number;
 }
 
+/** GET /api/fleet/insight/{panel_key} — live LLM panel insight (not cached) */
+export interface FleetPanelInsight {
+  summary: string;
+  sentiment: 'positive' | 'neutral' | 'caution' | 'warning';
+}
+
 /** GET /api/backtest/{id}/insight/{section_key} */
 export interface BacktestSectionInsight {
   summary: string;
@@ -774,19 +978,7 @@ export interface BacktestSectionInsight {
 
 /** GET /api/backtest/{id}/export */
 export interface BacktestExportReport {
-  metadata: {
-    report_version: string;
-    generated_at: string;
-    job_id: string;
-    strategy_id: string;
-    ticker: string;
-    start_date: string;
-    end_date: string;
-    initial_capital: number;
-    status: string;
-    created_at: string;
-    completed_at: string | null;
-  };
+  metadata: BacktestExportMetadata;
   executive_summary: BacktestExportSummary;
   cpcv_analysis: BacktestExportCPCV | null;
   monte_carlo_analysis: BacktestExportMonteCarlo | null;
@@ -823,6 +1015,196 @@ export interface WFLabelPoint {
 }
 
 // ---------------------------------------------------------------------------
+// F4: Fleet Risk Snapshot — volatility, VaR, ADX trend metrics
+// ---------------------------------------------------------------------------
+
+/** Per-ticker ADX trend metrics from Wilder's algorithm */
+export interface TickerTrendMetrics {
+  ticker: string;
+  adx: number;
+  di_positive: number;
+  di_negative: number;
+  /** 'BULLISH' | 'BEARISH' | 'NEUTRAL' */
+  trend_direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  /** 'WEAK' (ADX<20) | 'TRENDING' (20-40) | 'STRONG' (>40) */
+  trend_strength_label: 'WEAK' | 'TRENDING' | 'STRONG';
+  lookback_days: number;
+  bars_used: number;
+}
+
+/** GET /api/fleet/risk-snapshot */
+export interface FleetRiskSnapshot {
+  user_id: string;
+  regime: Regime;
+  fleet_volatility_annualized: number;
+  fleet_var_95_pct: number;
+  fleet_var_99_pct: number;
+  fleet_cvar_95_pct: number;
+  ticker_trend_metrics: TickerTrendMetrics[];
+  avg_adx: number;
+  trending_ticker_count: number;
+  total_ticker_count: number;
+  /**
+   * Maps each traded ticker to the strategy names of bots actively trading it.
+   * e.g. { "AAPL": ["breakout_momentum", "rsi_mean_reversion"] }
+   */
+  ticker_bots: Record<string, string[]>;
+  computed_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// F5: Circuit Breaker Status — live gauge dashboard
+// ---------------------------------------------------------------------------
+
+/** Per-bot circuit-breaker utilization for the gauge dashboard */
+export interface BotBreakerStatus {
+  bot_id: string;
+  strategy_name: string;
+  ticker: string;
+  regime: Regime;
+  daily_loss_pct: number;
+  daily_loss_threshold_pct: number;
+  daily_loss_utilization: number;
+  drawdown_pct: number;
+  drawdown_threshold_pct: number;
+  drawdown_utilization: number;
+  consecutive_losses: number;
+  consecutive_losses_threshold: number;
+  consecutive_losses_utilization: number;
+  /** True if any utilization > 0.8 */
+  any_breaker_at_risk: boolean;
+  /** True if any utilization >= 1.0 */
+  is_tripped: boolean;
+  /** 'passport' | 'default' */
+  thresholds_source: string;
+}
+
+/** Fleet-level circuit-breaker utilization */
+export interface FleetBreakerStatus {
+  regime: Regime;
+  daily_loss_pct: number;
+  daily_loss_threshold_pct: number;
+  daily_loss_utilization: number;
+  drawdown_pct: number;
+  drawdown_threshold_pct: number;
+  drawdown_utilization: number;
+  avg_correlation: number;
+  correlation_threshold: number;
+  correlation_utilization: number;
+  /** Sourced from live FleetCircuitBreakerModule — not recomputed */
+  is_tripped: boolean;
+  /** 'user_configured' | 'default' */
+  thresholds_source: string;
+}
+
+// ---------------------------------------------------------------------------
+// F6: Fear/Greed Gauge
+// ---------------------------------------------------------------------------
+
+/** One component of the market fear/greed composite gauge. */
+export interface FearGreedComponent {
+  /** 'Momentum' | 'Volatility' | 'Safe Haven' | 'Credit' */
+  name: string;
+  /** 0–100 score; null when data is unavailable */
+  score: number | null;
+  /** Normalized weight used in composite (0 when component excluded) */
+  weight: number;
+  /** 'Fear' | 'Greed' | 'Neutral' | 'Unknown' */
+  direction: string;
+}
+
+/** GET /api/fleet/fear-greed */
+export interface FearGreedGauges {
+  /** 0–100; mapped directly from fleet weather_score */
+  portfolio_gauge: number;
+  /** 'Extreme Fear' | 'Fear' | 'Neutral' | 'Greed' | 'Extreme Greed' */
+  portfolio_label: string;
+  /** 0–100 composite; null when fewer than 2 components are available */
+  market_gauge: number | null;
+  market_label: string | null;
+  /** portfolio_gauge − market_gauge; null when market_gauge is null */
+  divergence: number | null;
+  /** 'Aligned' | 'Moderate Divergence' | 'Significant Divergence' */
+  divergence_label: string;
+  components: FearGreedComponent[];
+  computed_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// F2: Portfolio Sensitivity Analysis
+// ---------------------------------------------------------------------------
+
+/** Portfolio-level performance metrics for one fleet configuration. */
+export interface BotSensitivityMetrics {
+  sharpe_ratio: number | null;
+  annualized_volatility: number | null;
+  max_drawdown: number | null;
+  var_95_pct: number | null;
+  enib: number | null;
+  /** True when fewer than 100 observations — all metric fields are null */
+  data_insufficient: boolean;
+  /** Number of daily observations T used to compute metrics (null when data_insufficient) */
+  n_observations: number | null;
+  /**
+   * Annualised standard error of sharpe_ratio under i.i.d. returns:
+   * SE = sqrt((252 + 0.5 * SR²) / T).  A delta_sharpe is statistically
+   * significant at ~95% when |delta| > 2 * sharpe_se.  Null when data_insufficient.
+   */
+  sharpe_se: number | null;
+}
+
+/**
+ * What-if result for adding or removing a single bot.
+ * is_candidate=false → removal impact; is_candidate=true → addition preview.
+ */
+export interface BotSensitivityResult {
+  /** null for addition candidates (no deployed bot yet) */
+  bot_id: string | null;
+  bot_name: string;
+  ticker: string;
+  is_candidate: boolean;
+  baseline_metrics: BotSensitivityMetrics;
+  simulated_metrics: BotSensitivityMetrics;
+  /** simulated − baseline Sharpe */
+  delta_sharpe: number | null;
+  delta_volatility: number | null;
+  delta_max_drawdown: number | null;
+  delta_enib: number | null;
+  /** Current (removal) or proposed (addition) capital fraction 0–1 */
+  capital_fraction: number;
+}
+
+/** GET /api/fleet/sensitivity */
+export interface FleetSensitivityReport {
+  user_id: string;
+  baseline_metrics: BotSensitivityMetrics;
+  /** Sorted by delta_sharpe ascending (worst impact first) */
+  removal_impacts: BotSensitivityResult[];
+  /** Sorted by delta_sharpe descending (best addition first) */
+  addition_previews: BotSensitivityResult[];
+  /** 'trades' | 'backtest' */
+  analytics_source: string;
+  computed_at: string;
+}
+
+/** GET /api/fleet/circuit-breakers */
+export interface CircuitBreakerStatusReport {
+  user_id: string;
+  fleet_status: FleetBreakerStatus;
+  bot_statuses: BotBreakerStatus[];
+  computed_at: string;
+  /** Non-dismissable Phase 1 safety disclaimer — must be rendered by UI */
+  display_only_warning: string;
+}
+
+/** PUT /api/settings/circuit-breakers — request body */
+export interface FleetCBThresholds {
+  cb_fleet_max_daily_loss_pct: number;
+  cb_fleet_max_drawdown_pct: number;
+  cb_fleet_max_avg_correlation: number;
+}
+
+// ---------------------------------------------------------------------------
 // Bot creation
 // ---------------------------------------------------------------------------
 
@@ -834,6 +1216,15 @@ export interface BotCreateRequest {
   initial_capital: number;
 }
 
+/** POST /api/bots/deploy request body */
+export interface BotDeployRequest {
+  strategy_id: string;
+  ticker: string;
+  capital_allocation_pct: number;
+  initial_capital: number;
+  passport_id: string;
+}
+
 // ---------------------------------------------------------------------------
 // Backtest
 // ---------------------------------------------------------------------------
@@ -843,16 +1234,42 @@ export interface BacktestJobSummary {
   job_id: string;
   status: string;
   strategy_id: string;
+  strategy_name?: string | null;
+  display_label?: string | null;
   ticker: string;
   start_date: string;
   end_date: string;
   passport_id: string | null;
   sharpe_ratio: number | null;
   total_return_pct: number | null;
+  validation_window: ValidationSimulationWindow | null;
+  validation_ready: boolean;
+  compute_wall_seconds?: number | null;
+  compute_cpu_seconds?: number | null;
   /** Current pipeline phase while the job is running; null when pending or complete. */
   progress_phase: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BacktestExportMetadata {
+  report_version: string;
+  generated_at: string;
+  job_id: string;
+  strategy_id: string;
+  strategy_name?: string | null;
+  display_label?: string | null;
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  status: string;
+  created_at: string;
+  completed_at: string | null;
+  validation_window: ValidationSimulationWindow | null;
+  validation_ready: boolean;
+  compute_wall_seconds?: number | null;
+  compute_cpu_seconds?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -865,6 +1282,13 @@ export interface EquityCurvePoint {
   date: string;
   /** Cumulative equity multiplier from 1.0 (1.0 = 100%) */
   equity: number;
+}
+
+/** One point on the persisted discovery-period market price curve. */
+export interface MarketPricePoint {
+  /** ISO date string "YYYY-MM-DD" */
+  date: string;
+  close: number;
 }
 
 /** Equity curve for a single CPCV path (sparse — one point per closed trade exit date). */
@@ -891,6 +1315,8 @@ export interface CPCVChartData {
   paths: CPCVPathSeries[];
   /** Date-aligned mean across all paths (forward-filled per-path equity, then averaged) */
   mean_curve: EquityCurvePoint[];
+  /** Canonical discovery-period daily close series for validation replay continuation */
+  market_price_curve: MarketPricePoint[];
   /** Contiguous regime blocks for background shading */
   regime_bands: RegimeBand[];
   n_paths: number;

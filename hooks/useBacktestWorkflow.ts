@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch, parseApiError, parseApiJson } from '@/lib/api';
+import { apiFetch, HttpError, parseApiError, parseApiJson } from '@/lib/api';
 import { pollingIntervals, queryKeys } from '@/lib/queryKeys';
 import type {
   BacktestRequest,
@@ -13,6 +13,14 @@ import type {
   BacktestSectionInsight,
   TradeRecord,
   PassportPromotionResponse,
+  ValidationSimulationComparison,
+  ValidationSimulationOverview,
+  ValidationSimulationQuestionAnswer,
+  ValidationSimulationTimeline,
+  ValidationSimulationTradeSummary,
+  ValidationSimulationRunList,
+  ValidationSimulationRunSummary,
+  ValidationSimulationSectionInsight,
   WFLabelPoint,
 } from '@/types/api';
 
@@ -83,6 +91,277 @@ export function useBacktestExport(
     },
     enabled: !!jobId && isComplete,
     staleTime: Infinity,
+  });
+}
+
+export function useValidationSimulationOverview(
+  jobId: string | null | undefined,
+  enabled = true,
+) {
+  return useQuery<ValidationSimulationOverview>({
+    queryKey: queryKeys.backtest.validation.overview(jobId),
+    queryFn: async () => {
+      const res = await apiFetch(`/api/backtest/${jobId!}/validation-simulation`);
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to fetch validation simulation overview',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationOverview>(res);
+    },
+    enabled: !!jobId && enabled,
+    refetchInterval: (query) => {
+      const data = query.state.data as ValidationSimulationOverview | undefined;
+      const status = data?.latest_run?.status;
+      return status === 'pending' || status === 'running' || status === 'prepared'
+        ? pollingIntervals.backtestProgress
+        : false;
+    },
+  });
+}
+
+export function useValidationSimulationRuns(
+  jobId: string | null | undefined,
+  enabled = true,
+) {
+  return useQuery<ValidationSimulationRunList>({
+    queryKey: queryKeys.backtest.validation.runs(jobId),
+    queryFn: async () => {
+      const res = await apiFetch(`/api/backtest/${jobId!}/validation-simulation/runs`);
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to fetch validation simulation runs',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationRunList>(res);
+    },
+    enabled: !!jobId && enabled,
+    refetchInterval: (query) => {
+      const data = query.state.data as ValidationSimulationRunList | undefined;
+      const hasActiveRun = data?.runs.some(
+        (run) =>
+          run.status === 'pending' ||
+          run.status === 'running' ||
+          run.status === 'prepared',
+      );
+      return hasActiveRun ? pollingIntervals.backtestProgress : false;
+    },
+  });
+}
+
+export function useRunValidationSimulation() {
+  const queryClient = useQueryClient();
+  return useMutation<ValidationSimulationRunSummary, Error, string>({
+    mutationFn: async (jobId) => {
+      const res = await apiFetch(`/api/backtest/${jobId}/validation-simulation`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to submit validation simulation',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationRunSummary>(res);
+    },
+    onSuccess: (data, jobId) => {
+      queryClient.setQueryData(
+        queryKeys.backtest.validation.run(jobId, data.run_id),
+        data,
+      );
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.backtest.validation.runs(jobId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['backtest', jobId, 'validation-simulation'],
+      });
+    },
+  });
+}
+
+export function useCancelValidationSimulation() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { jobId: string; runId: string }>({
+    mutationFn: async ({ jobId, runId }) => {
+      const res = await apiFetch(
+        `/api/backtest/${jobId}/validation-simulation/runs/${runId}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to cancel validation simulation',
+        );
+        throw new Error(detail);
+      }
+    },
+    onSuccess: (_data, { jobId, runId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['backtest', jobId, 'validation-simulation'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.backtest.validation.runs(jobId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.backtest.validation.run(jobId, runId),
+      });
+    },
+  });
+}
+
+export function useValidationSimulationTimeline(
+  jobId: string | null | undefined,
+  runId: string | null | undefined,
+  options?: {
+    enabled?: boolean;
+    live?: boolean;
+  },
+) {
+  const enabled = options?.enabled ?? true;
+  const live = options?.live ?? false;
+  return useQuery<ValidationSimulationTimeline>({
+    queryKey: queryKeys.backtest.validation.timeline(jobId, runId),
+    queryFn: async () => {
+      const res = await apiFetch(
+        `/api/backtest/${jobId!}/validation-simulation/runs/${runId!}/timeline`,
+      );
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to fetch validation simulation timeline',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationTimeline>(res);
+    },
+    enabled: !!jobId && !!runId && enabled,
+    refetchInterval: live ? pollingIntervals.backtestProgress : false,
+    staleTime: live ? 0 : Infinity,
+  });
+}
+
+export function useValidationSimulationTrades(
+  jobId: string | null | undefined,
+  runId: string | null | undefined,
+  options?: {
+    enabled?: boolean;
+    live?: boolean;
+  },
+) {
+  const enabled = options?.enabled ?? true;
+  const live = options?.live ?? false;
+  return useQuery<ValidationSimulationTradeSummary[]>({
+    queryKey: queryKeys.backtest.validation.trades(jobId, runId),
+    queryFn: async () => {
+      const res = await apiFetch(
+        `/api/backtest/${jobId!}/validation-simulation/runs/${runId!}/trades`,
+      );
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to fetch validation simulation trades',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationTradeSummary[]>(res);
+    },
+    enabled: !!jobId && !!runId && enabled,
+    refetchInterval: live ? pollingIntervals.backtestProgress : false,
+    staleTime: live ? 0 : Infinity,
+  });
+}
+
+export function useValidationSimulationComparison(
+  jobId: string | null | undefined,
+  runId: string | null | undefined,
+  enabled = true,
+) {
+  return useQuery<ValidationSimulationComparison>({
+    queryKey: queryKeys.backtest.validation.comparison(jobId, runId),
+    queryFn: async () => {
+      const res = await apiFetch(
+        `/api/backtest/${jobId!}/validation-simulation/runs/${runId!}/compare`,
+      );
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to fetch validation simulation comparison',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationComparison>(res);
+    },
+    enabled: !!jobId && !!runId && enabled,
+    staleTime: Infinity,
+  });
+}
+
+export function useValidationSimulationInsight(
+  jobId: string | null | undefined,
+  runId: string | null | undefined,
+  sectionKey: string,
+  enabled = true,
+) {
+  return useQuery<ValidationSimulationSectionInsight>({
+    queryKey: queryKeys.backtest.validation.insight(jobId, runId, sectionKey),
+    queryFn: async () => {
+      const res = await apiFetch(
+        `/api/backtest/${jobId!}/validation-simulation/runs/${runId!}/insight/${sectionKey}`,
+      );
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to fetch validation simulation insight',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationSectionInsight>(res);
+    },
+    enabled: !!jobId && !!runId && !!sectionKey && enabled,
+    staleTime: Infinity,
+  });
+}
+
+export function useAskValidationSimulationQuestion() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    ValidationSimulationQuestionAnswer,
+    Error,
+    { jobId: string; runId: string; question: string }
+  >({
+    mutationFn: async ({ jobId, runId, question }) => {
+      const res = await apiFetch(
+        `/api/backtest/${jobId}/validation-simulation/runs/${runId}/question`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        },
+      );
+      if (!res.ok) {
+        const detail = await parseApiError(
+          res,
+          'Failed to answer validation simulation question',
+        );
+        throw new Error(detail);
+      }
+      return parseApiJson<ValidationSimulationQuestionAnswer>(res);
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(
+        queryKeys.backtest.validation.question(
+          variables.jobId,
+          variables.runId,
+          variables.question.trim().toLowerCase(),
+        ),
+        data,
+      );
+    },
   });
 }
 
@@ -244,7 +523,10 @@ export function useBacktestInsight(
       const res = await apiFetch(`/api/backtest/${jobId!}/insight/${sectionKey}`);
       if (!res.ok) {
         const detail = await parseApiError(res, 'Insight not available');
-        throw new Error(detail);
+        // Preserve the HTTP status so consumers can distinguish:
+        //   503 = Anthropic not configured (genuine AI unavailability)
+        //   404 = section data missing for this job (insight not applicable)
+        throw new HttpError(res.status, detail);
       }
       return parseApiJson<BacktestSectionInsight>(res);
     },

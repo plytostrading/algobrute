@@ -5,27 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import WalkForwardTab from './WalkForwardTab';
 import MonteCarloTab from './MonteCarloTab';
+import SectionInsightCard from '@/components/insights/SectionInsightCard';
 import { useBacktestChartData } from '@/hooks/useBacktestChartData';
-import { REGIME_CHART_FILLS } from '@/lib/colors';
-import { REGIME_LABELS } from '@/lib/regimeLabel';
-import type { BacktestExportReport, CPCVChartData, Regime, TradeRecord } from '@/types/api';
+import type { BacktestExportReport, CPCVChartData, TradeRecord } from '@/types/api';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Area, AreaChart, ComposedChart, Line, ReferenceArea,
+  Area, AreaChart,
 } from 'recharts';
 
 // ---------------------------------------------------------------------------
-// Types for the fan chart internal data model
-// ---------------------------------------------------------------------------
-
-interface TimePoint {
-  ts: number;       // UTC ms timestamp for the time-scale XAxis
-  date: string;     // "YYYY-MM-DD" for tooltip
-  equity: number;   // equity value (1.0 = initial capital)
-}
-
-// ---------------------------------------------------------------------------
-// CPCVEquityCurveTab — main component using real chart data from the API
+// EquityCurveTab — area chart of actual cumulative equity from backtest trades
 // ---------------------------------------------------------------------------
 
 interface CPCVEquityCurveTabProps {
@@ -35,226 +24,11 @@ interface CPCVEquityCurveTabProps {
 }
 
 function CPCVEquityCurveTab({ jobId, trades, initialCapital }: CPCVEquityCurveTabProps) {
+  // CPCV summary stats — used only for the stats row, not the chart itself.
   const chartQuery = useBacktestChartData(jobId, true);
   const chartData: CPCVChartData | null | undefined = chartQuery.data;
 
-  // Convert mean curve to time-scaled array for the ComposedChart base data.
-  const meanPoints = useMemo<TimePoint[]>(() => {
-    if (!chartData?.mean_curve) return [];
-    return chartData.mean_curve.map((p) => ({
-      ts: new Date(p.date).getTime(),
-      date: p.date,
-      equity: p.equity,
-    }));
-  }, [chartData]);
-
-  // Convert each path's points to time-scaled arrays.
-  const pathPoints = useMemo<TimePoint[][]>(() => {
-    if (!chartData?.paths) return [];
-    return chartData.paths.map((path) =>
-      path.points.map((p) => ({
-        ts: new Date(p.date).getTime(),
-        date: p.date,
-        equity: p.equity,
-      }))
-    );
-  }, [chartData]);
-
-  // Convert regime bands to timestamp-based x1/x2 pairs.
-  const regimeBands = useMemo(() => {
-    if (!chartData?.regime_bands) return [];
-    return chartData.regime_bands.map((b) => ({
-      x1: new Date(b.start_date).getTime(),
-      x2: new Date(b.end_date + 'T23:59:59').getTime(),
-      regime: b.regime,
-    }));
-  }, [chartData]);
-
-  // Loading state
-  if (chartQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">
-        Loading CPCV chart…
-      </div>
-    );
-  }
-
-  // Fallback: if chart data is unavailable (legacy job or build failed),
-  // render the simple aggregate equity curve from trade records.
-  if (!chartData || meanPoints.length === 0) {
-    return <FallbackEquityCurveTab trades={trades} initialCapital={initialCapital} />;
-  }
-
-  const tooltipStyle = {
-    backgroundColor: 'var(--color-popover)',
-    borderColor: 'var(--color-border)',
-    borderRadius: '8px',
-    fontSize: '12px',
-  };
-
-  const positiveReturn = chartData.mean_curve.length > 0
-    ? chartData.mean_curve[chartData.mean_curve.length - 1].equity - 1.0
-    : 0;
-  const positivePaths = chartData.paths.filter((p) => {
-    const last = p.points[p.points.length - 1];
-    return last ? last.equity >= 1.0 : false;
-  }).length;
-
-  return (
-    <div className="flex flex-col gap-3">
-      {/* Fan chart */}
-      <div className="h-[300px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={meanPoints}
-            margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
-          >
-            <defs>
-              <linearGradient id="cpcvMeanGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.12} />
-                <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-
-            {/* Regime background bands */}
-            {regimeBands.map((b, i) => (
-              <ReferenceArea
-                key={i}
-                x1={b.x1}
-                x2={b.x2}
-                fill={REGIME_CHART_FILLS[b.regime]}
-                fillOpacity={0.3}
-                strokeOpacity={0}
-              />
-            ))}
-
-            <XAxis
-              dataKey="ts"
-              type="number"
-              scale="time"
-              domain={['dataMin', 'dataMax']}
-              tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(ms: number) =>
-                new Date(ms).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-              }
-              minTickGap={70}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v: number) => `${((v - 1) * 100).toFixed(0)}%`}
-              domain={['auto', 'auto']}
-              width={52}
-            />
-            <Tooltip
-              contentStyle={tooltipStyle}
-              formatter={(v: number) => [
-                `${((v - 1) * 100).toFixed(2)}%`,
-                'Mean return',
-              ]}
-              labelFormatter={(ms: number) =>
-                new Date(ms).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-              }
-            />
-
-            {/* CPCV path fan — each path is a faint independent line */}
-            {pathPoints.map((pts, i) => (
-              <Line
-                key={i}
-                data={pts}
-                dataKey="equity"
-                xAxisId={0}
-                dot={false}
-                activeDot={false}
-                stroke="var(--color-chart-2)"
-                strokeWidth={0.75}
-                strokeOpacity={0.2}
-                isAnimationActive={false}
-                connectNulls={false}
-              />
-            ))}
-
-            {/* Mean equity curve — bold foreground line */}
-            <Area
-              type="monotone"
-              dataKey="equity"
-              stroke="var(--color-chart-2)"
-              strokeWidth={2.5}
-              fill="url(#cpcvMeanGrad)"
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 2 }}
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Regime legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {([0, 1, 2, 3] as Regime[]).map((r) => (
-          <div key={r} className="flex items-center gap-1.5">
-            <div
-              className="h-2.5 w-2.5 rounded-sm"
-              style={{ backgroundColor: REGIME_CHART_FILLS[r] }}
-            />
-            <span className="text-[10px] text-muted-foreground">{REGIME_LABELS[r]}</span>
-          </div>
-        ))}
-        <span className="ml-auto text-[10px] italic text-muted-foreground/60">
-          regime shading from walk-forward labels
-        </span>
-      </div>
-
-      {/* CPCV stats row */}
-      <div className="grid grid-cols-4 divide-x rounded-md border">
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mean Sharpe</span>
-          <span className={`font-mono-data text-sm font-bold ${
-            chartData.mean_sharpe >= 1 ? 'text-success' : chartData.mean_sharpe >= 0 ? '' : 'text-destructive'
-          }`}>{chartData.mean_sharpe.toFixed(2)}</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Path Consistency</span>
-          <span className={`font-mono-data text-sm font-bold ${
-            chartData.path_consistency >= 0.7 ? 'text-success' : chartData.path_consistency >= 0.5 ? 'text-warning' : 'text-destructive'
-          }`}>{(chartData.path_consistency * 100).toFixed(0)}%</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Overfit Risk (PBO)</span>
-          <span className={`font-mono-data text-sm font-bold ${
-            chartData.pbo_probability < 0.3 ? 'text-success' : chartData.pbo_probability < 0.5 ? 'text-warning' : 'text-destructive'
-          }`}>{(chartData.pbo_probability * 100).toFixed(0)}%</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Paths Profitable</span>
-          <span className="font-mono-data text-sm font-bold">{positivePaths}/{chartData.n_paths}</span>
-        </div>
-      </div>
-
-      {positiveReturn !== 0 && (
-        <p className="px-1 text-[11px] italic text-muted-foreground">
-          Mean return across {chartData.n_paths} CPCV paths:
-          {' '}<span className={`font-mono-data font-semibold ${
-            positiveReturn > 0 ? 'text-success' : 'text-destructive'
-          }`}>{positiveReturn > 0 ? '+' : ''}{(positiveReturn * 100).toFixed(2)}%</span>
-          {' '}· faint lines = individual paths, bold = mean
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// FallbackEquityCurveTab — simple aggregate curve when chart data unavailable
-// ---------------------------------------------------------------------------
-
-function FallbackEquityCurveTab({ trades, initialCapital }: { trades: TradeRecord[]; initialCapital: number }) {
-  const chartData = useMemo(() => {
+  const chartData2 = useMemo(() => {
     const sorted = [...trades]
       .filter((t) => t.exit_date !== null && t.realized_pnl !== null)
       .sort((a, b) => a.exit_date!.localeCompare(b.exit_date!));
@@ -265,11 +39,18 @@ function FallbackEquityCurveTab({ trades, initialCapital }: { trades: TradeRecor
     });
   }, [trades, initialCapital]);
 
+  const positivePaths = chartData
+    ? chartData.paths.filter((p) => {
+        const last = p.points[p.points.length - 1];
+        return last ? last.equity >= 1.0 : false;
+      }).length
+    : null;
+
   return (
     <div className="flex flex-col gap-3">
       <div className="h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <AreaChart data={chartData2} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <defs>
               <linearGradient id="btEquityGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.15} />
@@ -282,11 +63,10 @@ function FallbackEquityCurveTab({ trades, initialCapital }: { trades: TradeRecor
               tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(d: string) => {
-                const dt = new Date(d);
-                return dt.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-              }}
-              interval={Math.floor(chartData.length / 8)}
+              tickFormatter={(d: string) =>
+                new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+              }
+              interval={Math.floor(chartData2.length / 8)}
             />
             <YAxis
               tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
@@ -303,7 +83,10 @@ function FallbackEquityCurveTab({ trades, initialCapital }: { trades: TradeRecor
                 borderRadius: '8px',
                 fontSize: '13px',
               }}
-              labelFormatter={(l: string) => new Date(l).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              formatter={(v: number) => [`$${(v as number).toLocaleString()}`, 'Equity']}
+              labelFormatter={(l: string) =>
+                new Date(l).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              }
             />
             <Area
               type="monotone"
@@ -317,8 +100,36 @@ function FallbackEquityCurveTab({ trades, initialCapital }: { trades: TradeRecor
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      {chartData.length === 0 && (
+
+      {chartData2.length === 0 && (
         <p className="text-xs text-muted-foreground text-center py-4">No completed trades to display equity curve.</p>
+      )}
+
+      {chartData && (
+        <div className="grid grid-cols-4 divide-x rounded-md border">
+          <div className="px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mean Sharpe</span>
+            <span className={`font-mono-data text-sm font-bold ${
+              chartData.mean_sharpe >= 1 ? 'text-success' : chartData.mean_sharpe >= 0 ? '' : 'text-destructive'
+            }`}>{chartData.mean_sharpe.toFixed(2)}</span>
+          </div>
+          <div className="px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Path Consistency</span>
+            <span className={`font-mono-data text-sm font-bold ${
+              chartData.path_consistency >= 0.7 ? 'text-success' : chartData.path_consistency >= 0.5 ? 'text-warning' : 'text-destructive'
+            }`}>{(chartData.path_consistency * 100).toFixed(0)}%</span>
+          </div>
+          <div className="px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Overfit Risk (PBO)</span>
+            <span className={`font-mono-data text-sm font-bold ${
+              chartData.pbo_probability < 0.3 ? 'text-success' : chartData.pbo_probability < 0.5 ? 'text-warning' : 'text-destructive'
+            }`}>{(chartData.pbo_probability * 100).toFixed(0)}%</span>
+          </div>
+          <div className="px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Paths Profitable</span>
+            <span className="font-mono-data text-sm font-bold">{positivePaths}/{chartData.n_paths}</span>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -343,7 +154,7 @@ function MetricBlock({ title, rows }: { title: string; rows: MetricRow[] }) {
   );
 }
 
-function DetailedMetricsTab({ report }: { report: BacktestExportReport }) {
+function DetailedMetricsTab({ jobId, report }: { jobId: string; report: BacktestExportReport }) {
   const s = report.executive_summary;
   const ta = report.trade_analytics;
 
@@ -391,6 +202,7 @@ function DetailedMetricsTab({ report }: { report: BacktestExportReport }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <SectionInsightCard jobId={jobId} sectionKey="detailed_metrics" />
       <MetricBlock title="Performance" rows={perfRows} />
       <MetricBlock title="Risk" rows={riskRows} />
       <MetricBlock title="Risk-Adjusted Ratios" rows={ratioRows} />
@@ -428,13 +240,18 @@ export default function BacktestResultsTabs({ jobId, report, trades }: BacktestR
             <CPCVEquityCurveTab jobId={jobId} trades={trades} initialCapital={initialCapital} />
           </TabsContent>
           <TabsContent value="metrics" className="mt-0">
-            <DetailedMetricsTab report={report} />
+            <DetailedMetricsTab jobId={jobId} report={report} />
           </TabsContent>
           <TabsContent value="walkforward" className="mt-0">
             <WalkForwardTab cpcv={report.cpcv_analysis} />
           </TabsContent>
           <TabsContent value="montecarlo" className="mt-0">
-            <MonteCarloTab mc={report.monte_carlo_analysis} bootstrap={report.bootstrap_analysis} />
+            <MonteCarloTab
+              jobId={jobId}
+              mc={report.monte_carlo_analysis}
+              bootstrap={report.bootstrap_analysis}
+              initialCapital={initialCapital}
+            />
           </TabsContent>
         </div>
       </Tabs>

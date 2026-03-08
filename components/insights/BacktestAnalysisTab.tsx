@@ -95,14 +95,19 @@ export default function BacktestAnalysisTab({ jobId }: BacktestAnalysisTabProps)
       <BacktestVerdict report={report} />
       <BacktestResultsTabs jobId={jobId} report={report} trades={trades} />
 
-      {/* Distribution Charts — only when we have enough trade records */}
+      {/* Distribution Charts — only when we have enough trade records and
+            by_regime trade analytics are populated (required by the insight
+            payload builder; if absent the LLM call would have no data). */}
       {trades.length >= 4 && (
         <Card className="py-0 overflow-hidden">
           <CardHeader className="border-b px-4 py-3">
             <CardTitle className="text-sm font-semibold">Regime Distribution Analysis</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
-            <SectionInsightCard jobId={jobId} sectionKey="regime_distribution" className="mb-4" />
+            {report.trade_analytics?.by_regime &&
+              Object.keys(report.trade_analytics.by_regime).length > 0 && (
+                <SectionInsightCard jobId={jobId} sectionKey="regime_distribution" className="mb-4" />
+            )}
             <RegimeDistributionCharts trades={trades} />
           </CardContent>
         </Card>

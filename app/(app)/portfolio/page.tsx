@@ -7,6 +7,7 @@ import PortfolioChart from '@/components/command-center/PortfolioChart';
 import TopRecommendationPreview from '@/components/command-center/TopRecommendationPreview';
 import CorrelationMatrix from '@/components/portfolio/CorrelationMatrix';
 import PortfolioContributionPanel from '@/components/portfolio/PortfolioContributionPanel';
+import FleetSensitivityPanel from '@/components/portfolio/FleetSensitivityPanel';
 import { useFleetWeather, useFleetWeatherHistory } from '@/hooks/useFleetWeather';
 import { useFleetState } from '@/hooks/useFleetState';
 import { useFleetRecommendations } from '@/hooks/useFleetRecommendations';
@@ -69,6 +70,9 @@ export default function PortfolioPage() {
 
       {/* F1 — Regime-conditioned pairwise correlation heatmap */}
       <CorrelationMatrix initialRegime={weather.current_regime} />
+
+      {/* F2 — Portfolio sensitivity what-if analysis */}
+      <FleetSensitivityPanel />
     </div>
   );
 }

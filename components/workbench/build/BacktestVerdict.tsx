@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, AlertTriangle, XCircle, Lightbulb } from 'lucide-react';
+import { formatBacktestComputeTime, getBacktestDisplayLabel } from '@/lib/backtestDisplay';
 import type { BacktestExportReport } from '@/types/api';
 
 type VerdictAssessment = 'promising' | 'mixed' | 'not_recommended';
@@ -60,6 +61,8 @@ export default function BacktestVerdict({ report }: BacktestVerdictProps) {
   const config = verdictConfig[assessment];
   const Icon = config.icon;
   const s = report.executive_summary;
+  const computeWall = formatBacktestComputeTime(report.metadata.compute_wall_seconds);
+  const computeCpu = formatBacktestComputeTime(report.metadata.compute_cpu_seconds);
 
   const narrative =
     report.llm_context?.deployment_recommendation ??
@@ -75,6 +78,11 @@ export default function BacktestVerdict({ report }: BacktestVerdictProps) {
           <Badge variant="outline" className={`font-mono-data text-[10px] font-bold ${config.badgeClass}`}>
             {config.label}
           </Badge>
+        </div>
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="font-mono-data">{getBacktestDisplayLabel(report.metadata)}</span>
+          {computeWall ? <span>Wall time {computeWall}</span> : null}
+          {computeCpu ? <span>CPU time {computeCpu}</span> : null}
         </div>
 
         <div className="flex items-start gap-2 rounded-md bg-muted/50 p-3">

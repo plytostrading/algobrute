@@ -18,6 +18,7 @@ import AnalyticsTab from '@/components/insights/AnalyticsTab';
 import AttributionTab from '@/components/insights/AttributionTab';
 import BacktestAnalysisTab from '@/components/insights/BacktestAnalysisTab';
 import { useBacktestList } from '@/hooks/useBacktestWorkflow';
+import { getBacktestDisplayLabel, formatBacktestComputeTime } from '@/lib/backtestDisplay';
 
 export default function InsightsPage() {
   const router = useRouter();
@@ -101,8 +102,11 @@ export default function InsightsPage() {
               ) : (
                 completedJobs.map((j) => (
                   <SelectItem key={j.job_id} value={j.job_id} className="font-mono-data text-xs">
-                    {j.ticker} · {j.start_date.slice(0, 10)} → {j.end_date.slice(0, 10)}
+                    {getBacktestDisplayLabel(j)}
                     {j.sharpe_ratio != null ? ` · SR ${j.sharpe_ratio.toFixed(2)}` : ''}
+                    {formatBacktestComputeTime(j.compute_wall_seconds)
+                      ? ` · ${formatBacktestComputeTime(j.compute_wall_seconds)}`
+                      : ''}
                   </SelectItem>
                 ))
               )}

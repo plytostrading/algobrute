@@ -15,6 +15,9 @@ import RiskSummary from '@/components/command-center/RiskSummary';
 // potential relocation to the Operations screen in a future batch.
 // RegimeBadge is now rendered inside WeatherDisplay (part of HeroZone).
 import PortfolioImpact from '@/components/command-center/PortfolioImpact';
+import RiskSnapshotCard from '@/components/command-center/RiskSnapshotCard';
+import CircuitBreakerMeters from '@/components/command-center/CircuitBreakerMeters';
+import FearGreedCard from '@/components/command-center/FearGreedCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleetWeather, useFleetWeatherHistory } from '@/hooks/useFleetWeather';
 import { useFleetNarrative } from '@/hooks/useFleetNarrative';
@@ -260,6 +263,15 @@ export default function CommandCenter() {
         risk={riskIntelligence}
         weatherTimestamp={weather?.timestamp}
       />
+
+      {/* F4: Risk Snapshot — fleet volatility, VaR metrics, and per-ticker ADX trend strength */}
+      <RiskSnapshotCard />
+
+      {/* F5: Circuit Breaker Meters — fleet and per-bot utilization gauges */}
+      <CircuitBreakerMeters />
+
+      {/* F6: Fear/Greed Gauge — portfolio vs market sentiment dual dial */}
+      <FearGreedCard />
 
       {/* Portfolio Risk Attribution — full-width (was half-width before Batch 3) */}
       <PortfolioImpact />

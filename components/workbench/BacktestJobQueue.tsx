@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X, Loader2 } from 'lucide-react';
+import { getBacktestDisplayLabel } from '@/lib/backtestDisplay';
 import type { BacktestJobSummary } from '@/types/api';
 
 /**
@@ -110,10 +111,10 @@ export default function BacktestJobQueue() {
                 ) : null}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
-                    {job.ticker} &mdash; {job.strategy_id}
+                    {getBacktestDisplayLabel(job)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {job.start_date} &rarr; {job.end_date}
+                    {job.status === 'running' ? 'Active discovery/backtest run' : 'Queued backtest'}
                   </p>
                 </div>
                 <Badge variant={job.status === 'running' ? 'default' : 'outline'}>

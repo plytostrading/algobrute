@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import StrategySelector from './StrategySelector';
 import type { BacktestParams } from './StrategySelector';
-import StrategyObject from './StrategyObject';
+import ValidationSimulationCard from './ValidationSimulationCard';
 import BacktestVerdict from './BacktestVerdict';
 import BacktestResultsTabs from './BacktestResultsTabs';
 import BacktestProgressStepper from './BacktestProgressStepper';
@@ -13,11 +13,13 @@ import {
   useBacktestExport,
   useBacktestTrades,
   useCancelBacktest,
+  useBacktestList,
 } from '@/hooks/useBacktestWorkflow';
 import { useBacktestBackground } from '@/hooks/useBacktestBackground';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, X } from 'lucide-react';
+import { getBacktestDisplayLabel } from '@/lib/backtestDisplay';
 
 type BuildState = 'idle' | 'submitting' | 'polling' | 'complete' | 'failed';
 
@@ -49,7 +51,36 @@ export default function BuildTab({
 
   const runMutation = useRunBacktest();
   const cancelMutation = useCancelBacktest();
+  const backtestListQuery = useBacktestList();
   const jobQuery = useBacktestJob(jobId);
+  const completedBacktests = useMemo(
+    () =>
+      (backtestListQuery.data ?? [])
+        .filter((job) => job.status === 'complete')
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        ),
+    [backtestListQuery.data],
+  );
+  const selectedSavedBacktest = useMemo(
+    () => completedBacktests.find((job) => job.job_id === jobId) ?? null,
+    [completedBacktests, jobId],
+  );
+
+  useEffect(() => {
+    if (activeJobId === jobId) {
+      return;
+    }
+    setJobId(activeJobId);
+    setBuildState(
+      activeJobId
+        ? completedBacktests.some((job) => job.job_id === activeJobId)
+          ? 'complete'
+          : 'polling'
+        : 'idle',
+    );
+  }, [activeJobId, completedBacktests, jobId]);
 
   const jobData = jobQuery.data as
     | {
@@ -85,6 +116,8 @@ export default function BuildTab({
           start_date: params.startDate,
           end_date: params.endDate,
           initial_capital: params.initialCapital,
+          profile: params.profile,
+          validation_simulation_days: params.validationSimulationDays,
         });
         setJobId(result.job_id);
         setBuildState('polling');
@@ -98,6 +131,7 @@ export default function BuildTab({
     },
     [selectedStrategyId, runMutation, onJobSubmitted, addJob],
   );
+
 
   const handleReset = useCallback(() => {
     // Remove from localStorage regardless of whether the job completed
@@ -114,7 +148,7 @@ export default function BuildTab({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Row 1: Strategy Selector | Strategy Object */}
+      {/* Row 1: Backtest configuration with inline strategy details | Validation playback */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
         <div className="md:col-span-5">
           <StrategySelector
@@ -122,12 +156,16 @@ export default function BuildTab({
             onStrategyChange={onStrategyChange}
             onSubmit={(params) => void handleSubmit(params)}
             isSubmitting={isRunning}
-            canReset={buildState === 'complete' || buildState === 'failed'}
+            canReset={jobId !== null || buildState === 'failed'}
             onReset={handleReset}
           />
         </div>
         <div className="md:col-span-7">
-          <StrategyObject selectedStrategyId={selectedStrategyId} />
+          <ValidationSimulationCard
+            jobId={jobId}
+            jobLabel={selectedSavedBacktest ? getBacktestDisplayLabel(selectedSavedBacktest) : null}
+            mode="compact"
+          />
         </div>
       </div>
 
@@ -201,7 +239,9 @@ export default function BuildTab({
           <CardContent className="flex items-center gap-3 py-4">
             <AlertCircle className="h-5 w-5 text-destructive" />
             <p className="text-sm text-destructive">
-              Failed to load results. Please reset and try again.
+              {exportQuery.error instanceof Error
+                ? exportQuery.error.message
+                : 'Failed to load results. Please reset and try again.'}
             </p>
           </CardContent>
         </Card>

@@ -38,6 +38,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useBacktestBackground } from '@/hooks/useBacktestBackground';
 import { apiFetch, parseApiJson } from '@/lib/api';
+import { getBacktestDisplayLabel } from '@/lib/backtestDisplay';
 import { queryKeys } from '@/lib/queryKeys';
 import type { BacktestJobSummary } from '@/types/api';
 
@@ -90,15 +91,13 @@ export default function BacktestJobNotifier() {
       // Status transition detected
       prevStatusRef.current[summary.job_id] = current;
 
-      const bgJob = jobs.find((j) => j.jobId === summary.job_id);
+      const jobLabel = getBacktestDisplayLabel(summary);
 
       if (current === 'complete') {
         toast.success(
-          `Backtest complete${bgJob?.ticker ? `: ${bgJob.ticker}` : ''}`,
+          'Backtest complete',
           {
-            description: bgJob?.strategyId
-              ? `${bgJob.strategyId} finished successfully.`
-              : `Job ${summary.job_id} finished successfully.`,
+            description: `${jobLabel} finished successfully.`,
             action: {
               label: 'View results',
               onClick: () =>
@@ -110,11 +109,9 @@ export default function BacktestJobNotifier() {
         removeJob(summary.job_id);
       } else if (current === 'failed') {
         toast.error(
-          `Backtest failed${bgJob?.ticker ? `: ${bgJob.ticker}` : ''}`,
+          'Backtest failed',
           {
-            description: bgJob?.strategyId
-              ? `${bgJob.strategyId} did not complete successfully.`
-              : `Job ${summary.job_id} failed.`,
+            description: `${jobLabel} did not complete successfully.`,
             duration: 10_000,
           },
         );

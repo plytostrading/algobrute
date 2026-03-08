@@ -85,8 +85,34 @@ export default function SectionInsightCard({
     );
   }
 
-  // Silently hide on error or unavailability (LLM not configured, 404, etc.)
-  if (isError || !data) return null;
+  // Any error (503 = Anthropic not configured, 404 = LLM call failed, etc.)
+  // → render a persistent, subtle indicator so the card area doesn't vanish
+  // after the loading skeleton appeared.  Parent components are responsible
+  // for not mounting this card when the underlying section data is absent;
+  // any error reaching here means the AI genuinely failed.
+  //
+  // Deliberately NOT returning null — a card that disappears after a visible
+  // skeleton is more disorienting than a quiet "unavailable" note.
+  if (isError) {
+    return (
+      <div
+        className={`rounded-md border border-dashed bg-muted/10 p-3 ${className}`}
+        role="note"
+        aria-label="AI insight unavailable"
+      >
+        <div className="flex items-center gap-1.5 opacity-40">
+          <Sparkles className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            AI Insight unavailable
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Silently hide when data hasn’t arrived yet (should not reach here in normal flow
+  // since isLoading is handled above, but guards against unexpected state).
+  if (!data) return null;
 
   const style = SENTIMENT_STYLES[data.sentiment] ?? SENTIMENT_STYLES.neutral;
   const sentimentLabel = SENTIMENT_LABELS[data.sentiment] ?? 'Insight';

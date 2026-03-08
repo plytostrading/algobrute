@@ -38,7 +38,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useStrategies } from '@/hooks/useStrategies';
-import { useCreateBot } from '@/hooks/useBots';
+import { useDeployBot } from '@/hooks/useBots';
 import { usePromoteToPassport, usePassportForJob } from '@/hooks/useBacktestWorkflow';
 import type { PassportPromotionResponse } from '@/types/api';
 import StrategyDNA from '@/components/portfolio/StrategyDNA';
@@ -232,19 +232,21 @@ export default function DeployTab({ selectedStrategyId, activeJobId }: DeployTab
   }, [passport]);
 
   const { data: strategies = [] } = useStrategies();
-  const createBot = useCreateBot();
+  const deployBot = useDeployBot();
 
   const handleLaunch = useCallback(() => {
-    if (!strategyId) return;
-    createBot.mutate({
+    if (!strategyId || !passport?.passport_id) return;
+    deployBot.mutate({
       strategy_id: strategyId,
       ticker,
       capital_allocation_pct: Number(capitalPct) / 100,
       initial_capital: Number(initialCapital),
+      passport_id: passport.passport_id,
     });
-  }, [strategyId, ticker, capitalPct, initialCapital, createBot]);
+  }, [strategyId, ticker, capitalPct, initialCapital, passport, deployBot]);
 
   const isReady = !!strategyId && !!ticker && Number(capitalPct) > 0 && Number(initialCapital) > 0;
+  const canLaunch = isReady && !!passport?.passport_id;
   const deploymentNotApproved = passport !== undefined && !passport.deployment_approved;
 
   if (!activeJobId) return <NoBacktestGuide />;
@@ -348,11 +350,11 @@ export default function DeployTab({ selectedStrategyId, activeJobId }: DeployTab
           )}
 
           {/* Bot launch feedback */}
-          {createBot.isSuccess && (
+          {deployBot.isSuccess && (
             <div className="flex items-center justify-between rounded-md bg-success/10 px-3 py-2 text-sm text-success">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" />
-                Bot deployed successfully!
+                Passport-backed deployment launched successfully!
               </div>
               <Button
                 variant="ghost"
@@ -366,10 +368,10 @@ export default function DeployTab({ selectedStrategyId, activeJobId }: DeployTab
               </Button>
             </div>
           )}
-          {createBot.isError && (
+          {deployBot.isError && (
             <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               <AlertCircle className="h-4 w-4" />
-              {createBot.error?.message ?? 'Deployment failed. Please try again.'}
+              {deployBot.error?.message ?? 'Deployment failed. Please try again.'}
             </div>
           )}
 
@@ -378,10 +380,10 @@ export default function DeployTab({ selectedStrategyId, activeJobId }: DeployTab
               <Button
                 size="lg"
                 className="w-full bg-success text-white hover:bg-success/90"
-                disabled={!isReady || createBot.isPending}
+                disabled={!canLaunch || deployBot.isPending}
               >
                 <Rocket className="mr-2 h-4 w-4" />
-                {createBot.isPending ? 'Launching…' : 'Launch Deployment'}
+                {deployBot.isPending ? 'Launching…' : 'Launch Deployment'}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

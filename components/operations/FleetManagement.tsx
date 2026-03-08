@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Pause, Play, Circle, ShieldAlert, Loader2 } from 'lucide-react';
+import { Pause, Play, Circle, ShieldAlert } from 'lucide-react';
 import PauseConfirmDialog from '@/components/operations/PauseConfirmDialog';
 import ResumeConfirmDialog from '@/components/operations/ResumeConfirmDialog';
 import MonitoringStatusCard from '@/components/operations/MonitoringStatusCard';

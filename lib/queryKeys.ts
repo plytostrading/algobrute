@@ -31,6 +31,11 @@ export const queryKeys = {
     correlationInsight: (regime: number) => ['fleet', 'correlation', regime, 'insight'] as const,
     benchmark: (ticker: string) => ['fleet', 'benchmark', ticker] as const,
     portfolioContribution: ['fleet', 'portfolio-contribution'] as const,
+    riskSnapshot: ['fleet', 'risk-snapshot'] as const,
+    circuitBreakers: ['fleet', 'circuit-breakers'] as const,
+    fearGreed: ['fleet', 'fear-greed'] as const,
+    sensitivity: ['fleet', 'sensitivity'] as const,
+    panelInsight: (panelKey: string) => ['fleet', 'insight', panelKey] as const,
   },
   monitoring: {
     all: ['monitoring'] as const,
@@ -57,9 +62,37 @@ export const queryKeys = {
       ['backtest', jobId, 'passport'] as const,
     chartData: (jobId: string | null | undefined) =>
       ['backtest', jobId, 'chart-data'] as const,
+    mcFan: (jobId: string | null | undefined) =>
+      ['backtest', jobId, 'mc-fan'] as const,
     regimeLabels: (jobId: string | null | undefined) =>
       ['backtest', jobId, 'regime-labels'] as const,
     insight: (jobId: string | null | undefined, sectionKey: string) =>
       ['backtest', jobId, 'insight', sectionKey] as const,
+    validation: {
+      overview: (jobId: string | null | undefined) =>
+        ['backtest', jobId, 'validation-simulation'] as const,
+      runs: (jobId: string | null | undefined) =>
+        ['backtest', jobId, 'validation-simulation', 'runs'] as const,
+      run: (jobId: string | null | undefined, runId: string | null | undefined) =>
+        ['backtest', jobId, 'validation-simulation', 'runs', runId] as const,
+      events: (jobId: string | null | undefined, runId: string | null | undefined) =>
+        ['backtest', jobId, 'validation-simulation', 'events', runId] as const,
+      trades: (jobId: string | null | undefined, runId: string | null | undefined) =>
+        ['backtest', jobId, 'validation-simulation', 'trades', runId] as const,
+      timeline: (jobId: string | null | undefined, runId: string | null | undefined) =>
+        ['backtest', jobId, 'validation-simulation', 'timeline', runId] as const,
+      comparison: (jobId: string | null | undefined, runId: string | null | undefined) =>
+        ['backtest', jobId, 'validation-simulation', 'compare', runId] as const,
+      insight: (
+        jobId: string | null | undefined,
+        runId: string | null | undefined,
+        sectionKey: string,
+      ) => ['backtest', jobId, 'validation-simulation', 'insight', runId, sectionKey] as const,
+      question: (
+        jobId: string | null | undefined,
+        runId: string | null | undefined,
+        question?: string | null,
+      ) => ['backtest', jobId, 'validation-simulation', 'question', runId, question ?? null] as const,
+    },
   },
 } as const;
