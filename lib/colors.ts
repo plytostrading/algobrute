@@ -3,35 +3,45 @@
  *
  * Centralises all color decisions so components don't hardcode hex values
  * or Tailwind class names in isolation.
+ *
+ * Accent hex values are aligned with the AlgoBrute Design System (DESIGN_SYSTEM.md
+ * in algobrute-website). Always use the dark-mode hex values here because these
+ * are used in SVG / canvas / Recharts contexts that cannot use CSS variables.
  */
 
 // ---------------------------------------------------------------------------
 // Regime colors (backend uses integer keys 0-3)
 // ---------------------------------------------------------------------------
 
-/** Chart background fill colors by Regime integer */
+/**
+ * Chart background fill colors by Regime integer.
+ * Uses design-system alpha convention: hex + '14' (8% tint).
+ */
 export const REGIME_CHART_FILLS: Record<number, string> = {
-  0: '#dbeafe', // LOW_VOL      — blue-100
-  1: '#dcfce7', // NORMAL       — green-100
-  2: '#fef3c7', // ELEVATED_VOL — amber-100
-  3: '#fee2e2', // CRISIS       — red-100
+  0: '#3b82f614', // LOW_VOL      — BLUE  + alpha
+  1: '#10b98114', // NORMAL       — GREEN + alpha
+  2: '#f59e0b14', // ELEVATED_VOL — AMBER + alpha
+  3: '#ef444414', // CRISIS       — RED   + alpha
 };
 
-/** Line / badge hex colors by Regime integer */
+/**
+ * Line / badge hex colors by Regime integer.
+ * Exact design-system dark-mode accent values.
+ */
 export const REGIME_HEX: Record<number, string> = {
-  0: '#3B82F6', // LOW_VOL      — blue-500
-  1: '#22C55E', // NORMAL       — green-500
-  2: '#F59E0B', // ELEVATED_VOL — amber-500
-  3: '#EF4444', // CRISIS       — red-500
+  0: '#3b82f6', // LOW_VOL      — DS: BLUE
+  1: '#10b981', // NORMAL       — DS: GREEN  (was #22C55E)
+  2: '#f59e0b', // ELEVATED_VOL — DS: AMBER
+  3: '#ef4444', // CRISIS       — DS: RED
 };
 
 /** Legacy mapping from RegimeType string (used in mock/chart components) */
 export const REGIME_STRING_HEX: Record<string, string> = {
-  LOW_VOL:      '#3B82F6',
-  NORMAL:       '#22C55E',
-  HIGH_VOL:     '#F59E0B',
-  ELEVATED_VOL: '#F59E0B',
-  CRISIS:       '#EF4444',
+  LOW_VOL:      '#3b82f6', // DS: BLUE
+  NORMAL:       '#10b981', // DS: GREEN
+  HIGH_VOL:     '#f59e0b', // DS: AMBER
+  ELEVATED_VOL: '#f59e0b', // DS: AMBER
+  CRISIS:       '#ef4444', // DS: RED
 };
 
 // ---------------------------------------------------------------------------
