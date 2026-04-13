@@ -59,118 +59,146 @@
   /* Trading-specific semantic colors */
   --color-profit: var(--success);
   --color-loss: var(--destructive);
+
+  /* Design system accent aliases */
+  --color-amber: var(--warning);
+  --color-blue: var(--info);
+  --color-green: var(--success);
+  --color-red: var(--destructive);
+  --color-purple: var(--purple);
 }
 
 /* ========================================
-   Light theme
+   Light theme — AlgoBrute Design System
+   Navy-slate palette: not pure white, still
+   reads as a trading terminal.
    ======================================== */
 :root {
   --radius: 0.5rem;
 
-  --background: #f8f9fa;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  /* Surfaces */
+  --background:         #eef2f7;  /* DS: BG light */
+  --foreground:         #0b1929;  /* DS: T1 light */
+  --card:               #ffffff;  /* DS: CARD light */
+  --card-foreground:    #0b1929;
+  --popover:            #ffffff;
+  --popover-foreground: #0b1929;
 
-  --primary: #0f172a;
+  /* Primary */
+  --primary:            #0b1929;
   --primary-foreground: #ffffff;
 
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
+  /* Secondary / Muted — mapped to border colors */
+  --secondary:           #d6dfe9; /* DS: BORDER light */
+  --secondary-foreground: #0b1929;
 
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted:              #d6dfe9;
+  --muted-foreground:   #3f6070;  /* DS: T3 light */
 
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
+  --accent:             #c0cedc;  /* DS: BORDER2 light */
+  --accent-foreground:  #0b1929;
 
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
+  /* Semantic accents — design-system aligned */
+  --destructive:             #c4202a;  /* DS: RED light */
+  --destructive-foreground:  #ffffff;
 
-  --success: #16a34a;
-  --success-foreground: #ffffff;
+  --success:             #0a7a57;  /* DS: GREEN light */
+  --success-foreground:  #ffffff;
 
-  --warning: #d97706;
-  --warning-foreground: #ffffff;
+  --warning:             #c47d07;  /* DS: AMBER light */
+  --warning-foreground:  #ffffff;
 
-  --info: #2563eb;
-  --info-foreground: #ffffff;
+  --info:                #1558b0;  /* DS: BLUE light */
+  --info-foreground:     #ffffff;
 
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #0f172a;
+  --purple:              #6225b2;  /* DS: PURPLE light */
 
-  --chart-1: #2563eb;
-  --chart-2: #16a34a;
-  --chart-3: #d97706;
-  --chart-4: #dc2626;
-  --chart-5: #7c3aed;
+  /* Borders */
+  --border: #d6dfe9;  /* DS: BORDER light */
+  --input:  #d6dfe9;
+  --ring:   #0b1929;
 
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #0f172a;
+  /* Charts — design-system accent order */
+  --chart-1: #1558b0;  /* BLUE   */
+  --chart-2: #0a7a57;  /* GREEN  */
+  --chart-3: #c47d07;  /* AMBER  */
+  --chart-4: #c4202a;  /* RED    */
+  --chart-5: #6225b2;  /* PURPLE */
+
+  /* Sidebar */
+  --sidebar:                    #ffffff;
+  --sidebar-foreground:         #0b1929;
+  --sidebar-primary:            #0b1929;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f9;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #0f172a;
+  --sidebar-accent:             #d6dfe9;
+  --sidebar-accent-foreground:  #0b1929;
+  --sidebar-border:             #d6dfe9;
+  --sidebar-ring:               #0b1929;
 }
 
 /* ========================================
-   Dark theme
+   Dark theme — AlgoBrute Design System
+   Default mode. Deep navy, not pure black.
    ======================================== */
 .dark {
-  --background: #030712;
-  --foreground: #f8fafc;
-  --card: #0f172a;
-  --card-foreground: #f8fafc;
-  --popover: #0f172a;
-  --popover-foreground: #f8fafc;
+  /* Surfaces */
+  --background:         #0c0f18;  /* DS: BG dark */
+  --foreground:         #f1f5f9;  /* DS: T1 dark */
+  --card:               #131821;  /* DS: CARD dark */
+  --card-foreground:    #f1f5f9;
+  --popover:            #131821;
+  --popover-foreground: #f1f5f9;
 
-  --primary: #f8fafc;
-  --primary-foreground: #0f172a;
+  /* Primary */
+  --primary:            #f1f5f9;
+  --primary-foreground: #0c0f18;
 
-  --secondary: #1e293b;
-  --secondary-foreground: #f8fafc;
+  /* Secondary / Muted — mapped to border tokens */
+  --secondary:           #1d2339; /* DS: BORDER dark */
+  --secondary-foreground: #f1f5f9;
 
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
+  --muted:              #1d2339;
+  --muted-foreground:   #a0b8d0;  /* DS: T3 dark */
 
-  --accent: #1e293b;
-  --accent-foreground: #f8fafc;
+  --accent:             #263048;  /* DS: BORDER2 dark */
+  --accent-foreground:  #f1f5f9;
 
-  --destructive: #f87171;
-  --destructive-foreground: #0f172a;
+  /* Semantic accents — design-system aligned */
+  --destructive:             #ef4444;  /* DS: RED dark */
+  --destructive-foreground:  #0c0f18;
 
-  --success: #4ade80;
-  --success-foreground: #0f172a;
+  --success:             #10b981;  /* DS: GREEN dark */
+  --success-foreground:  #0c0f18;
 
-  --warning: #fbbf24;
-  --warning-foreground: #0f172a;
+  --warning:             #f59e0b;  /* DS: AMBER dark */
+  --warning-foreground:  #0c0f18;
 
-  --info: #60a5fa;
-  --info-foreground: #0f172a;
+  --info:                #3b82f6;  /* DS: BLUE dark */
+  --info-foreground:     #0c0f18;
 
-  --border: #1e293b;
-  --input: #1e293b;
-  --ring: #f8fafc;
+  --purple:              #a78bfa;  /* DS: PURPLE dark */
 
-  --chart-1: #60a5fa;
-  --chart-2: #4ade80;
-  --chart-3: #fbbf24;
-  --chart-4: #f87171;
-  --chart-5: #a78bfa;
+  /* Borders */
+  --border: #1d2339;  /* DS: BORDER dark */
+  --input:  #1d2339;
+  --ring:   #263048;
 
-  --sidebar: #0f172a;
-  --sidebar-foreground: #f8fafc;
-  --sidebar-primary: #f8fafc;
-  --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #f8fafc;
+  /* Charts — design-system accent order */
+  --chart-1: #3b82f6;  /* BLUE   */
+  --chart-2: #10b981;  /* GREEN  */
+  --chart-3: #f59e0b;  /* AMBER  */
+  --chart-4: #ef4444;  /* RED    */
+  --chart-5: #a78bfa;  /* PURPLE */
+
+  /* Sidebar — one step darker than card */
+  --sidebar:                    #0e1220;  /* terminal header bg */
+  --sidebar-foreground:         #f1f5f9;
+  --sidebar-primary:            #f1f5f9;
+  --sidebar-primary-foreground: #0c0f18;
+  --sidebar-accent:             #1d2339;
+  --sidebar-accent-foreground:  #f1f5f9;
+  --sidebar-border:             #1d2339;
+  --sidebar-ring:               #263048;
 }
 
 @layer base {
