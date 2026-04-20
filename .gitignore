@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Layer 3 persona screenshot output (not committed; re-generated per run)
+e2e-screenshots/
