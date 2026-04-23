@@ -25,12 +25,29 @@ import {
   type ReferencePriceSeries,
 } from '@/hooks/useFleetJourney';
 
+// Fills for the overlay on the price chart. Raised from ~8% to 18-22%
+// so NORMAL / LOW_VOL are actually visible (previously indistinguishable).
+// Hues chosen for distinguishability even under low saturation:
+//   NORMAL   — indigo/blue
+//   LOW_VOL  — teal (NOT green, which is too close to blue at low alpha)
+//   ELEVATED — amber
+//   CRISIS   — red
 const REGIME_BAND_FILL: Record<string, string> = {
-  '1': 'rgba(59,130,246,0.08)',
-  '2': 'rgba(34,197,94,0.08)',
-  '3': 'rgba(234,179,8,0.12)',
-  '4': 'rgba(239,68,68,0.14)',
-  default: 'rgba(156,163,175,0.08)',
+  '1': 'rgba(99,102,241,0.18)',    // indigo — NORMAL
+  '2': 'rgba(20,184,166,0.18)',    // teal — LOW_VOL (more distinct from blue than green was)
+  '3': 'rgba(234,179,8,0.22)',     // amber — ELEVATED_VOL
+  '4': 'rgba(239,68,68,0.26)',     // red — CRISIS
+  default: 'rgba(156,163,175,0.10)',
+};
+
+// Solid variants for the regime ribbon strip (above the chart) + legend
+// swatches. Same hues, full saturation.
+const REGIME_RIBBON_FILL: Record<string, string> = {
+  '1': '#6366f1',
+  '2': '#14b8a6',
+  '3': '#eab308',
+  '4': '#ef4444',
+  default: '#94a3b8',
 };
 
 const REGIME_LABEL: Record<string, string> = {
@@ -119,10 +136,11 @@ export function ReferencePriceChart({
             </CardTitle>
             <CardDescription>
               Real close prices over the same window as your fleet journey.
-              Regime-colored background shows the <strong>market-wide regime</strong>{' '}
-              on each date — shading is the same across all tickers because
-              the regime is derived from macro conditions, not per-equity
-              volatility. Use the picker to inspect any ticker in your fleet.
+              The <strong>regime ribbon</strong> above the chart shows each
+              regime period as a labeled solid block, and the chart background
+              tints the corresponding period with the same color. Regime is{' '}
+              <strong>market-wide</strong> — derived from macro conditions —
+              so the ribbon is the same across every ticker in the picker.
             </CardDescription>
           </div>
 
@@ -146,6 +164,15 @@ export function ReferencePriceChart({
           </div>
         ) : (
           <>
+            {/* Regime ribbon — always visible caption above the price chart.
+                Labels each regime segment so even subtle background bands are
+                unambiguous. */}
+            <RegimeRibbon
+              bands={bands}
+              firstDate={effectiveData.points[0]?.date}
+              lastDate={effectiveData.points[effectiveData.points.length - 1]?.date}
+            />
+
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -176,7 +203,9 @@ export function ReferencePriceChart({
                       x2={b.end}
                       fill={REGIME_BAND_FILL[b.regime] ?? REGIME_BAND_FILL.default}
                       fillOpacity={1}
-                      stroke="none"
+                      stroke={REGIME_RIBBON_FILL[b.regime] ?? REGIME_RIBBON_FILL.default}
+                      strokeOpacity={0.35}
+                      strokeDasharray="2 4"
                     />
                   ))}
 
@@ -283,29 +312,122 @@ function compressRegimeBands(
 }
 
 function RegimeLegend({ bands }: { bands: RegimeBand[] }) {
-  const seen = new Set<string>();
-  const regimes = bands.filter((b) => {
-    if (seen.has(b.regime)) return false;
-    seen.add(b.regime);
-    return true;
-  });
+  const counts = new Map<string, number>();
+  for (const b of bands) {
+    const days = Math.max(
+      1,
+      Math.floor(
+        (new Date(b.end).getTime() - new Date(b.start).getTime()) /
+          (24 * 3600 * 1000),
+      ) + 1,
+    );
+    counts.set(b.regime, (counts.get(b.regime) ?? 0) + days);
+  }
+  const regimes = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   if (regimes.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-      <span className="font-semibold uppercase tracking-widest">Regimes</span>
-      {regimes.map((b) => (
-        <span key={b.regime} className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-3 text-[11px]">
+      <span className="font-semibold uppercase tracking-widest text-muted-foreground">
+        Regimes observed
+      </span>
+      {regimes.map(([regime, days]) => (
+        <span key={regime} className="flex items-center gap-1.5">
           <span
-            className="h-2.5 w-4 rounded-sm"
+            className="h-3 w-4 rounded-sm border"
             style={{
-              backgroundColor: REGIME_BAND_FILL[b.regime] ?? REGIME_BAND_FILL.default,
+              backgroundColor: REGIME_RIBBON_FILL[regime] ?? REGIME_RIBBON_FILL.default,
               borderColor: 'hsl(var(--border))',
-              borderWidth: '1px',
             }}
           />
-          <span>{REGIME_LABEL[b.regime] ?? b.regime}</span>
+          <span className="font-semibold text-foreground">
+            {REGIME_LABEL[regime] ?? regime}
+          </span>
+          <span className="font-mono text-muted-foreground">{days}d</span>
         </span>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Regime ribbon: a thick solid-colored strip rendered directly above
+ * the price chart. Each regime band is drawn as a labeled segment
+ * proportional to its duration. Even when the background shading on
+ * the chart is subtle, the ribbon is unmissable.
+ */
+function RegimeRibbon({
+  bands,
+  firstDate,
+  lastDate,
+}: {
+  bands: RegimeBand[];
+  firstDate: string | undefined;
+  lastDate: string | undefined;
+}) {
+  if (bands.length === 0 || !firstDate || !lastDate) return null;
+  const winStart = new Date(firstDate).getTime();
+  const winEnd = new Date(lastDate).getTime();
+  const winSpan = Math.max(1, winEnd - winStart);
+
+  const firstBand = bands[0];
+  const lastBand = bands[bands.length - 1];
+  const bandStart = new Date(firstBand.start).getTime();
+  const bandEnd = new Date(lastBand.end).getTime();
+
+  const prePct = Math.max(0, ((bandStart - winStart) / winSpan) * 100);
+  const postPct = Math.max(0, ((winEnd - bandEnd) / winSpan) * 100);
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        Regime timeline
+        <span className="font-normal text-muted-foreground/70">
+          · each block is a regime period ({firstDate} → {lastDate})
+        </span>
+      </div>
+      <div className="flex h-6 w-full items-stretch overflow-hidden rounded-md border">
+        {/* Pre-observation gap (no regime data collected here) */}
+        {prePct > 0.5 && (
+          <div
+            className="flex items-center justify-center bg-muted text-[9px] font-mono text-muted-foreground"
+            style={{ width: `${prePct}%` }}
+            title="No regime data before first observation"
+          >
+            {prePct > 8 ? 'no regime data' : ''}
+          </div>
+        )}
+        {bands.map((b, i) => {
+          const segStart = new Date(b.start).getTime();
+          const segEnd = new Date(b.end).getTime();
+          const pct = ((segEnd - segStart) / winSpan) * 100;
+          const days =
+            Math.floor((segEnd - segStart) / (24 * 3600 * 1000)) + 1;
+          const color = REGIME_RIBBON_FILL[b.regime] ?? REGIME_RIBBON_FILL.default;
+          const label = REGIME_LABEL[b.regime] ?? b.regime;
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-center text-[9px] font-mono font-semibold text-white"
+              style={{
+                width: `${Math.max(0.5, pct)}%`,
+                backgroundColor: color,
+                borderLeft: i === 0 ? undefined : '1px solid rgba(0,0,0,0.2)',
+              }}
+              title={`${label} · ${b.start} → ${b.end} (${days}d)`}
+            >
+              {pct > 6 ? `${label} ${days}d` : pct > 3 ? label : ''}
+            </div>
+          );
+        })}
+        {/* Post-observation gap (if the last band ends before end-of-window) */}
+        {postPct > 0.5 && (
+          <div
+            className="flex items-center justify-center bg-muted text-[9px] font-mono text-muted-foreground"
+            style={{ width: `${postPct}%` }}
+            title="No regime data after last observation"
+          />
+        )}
+      </div>
     </div>
   );
 }
