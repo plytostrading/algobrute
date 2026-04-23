@@ -25,37 +25,72 @@ import {
   type ReferencePriceSeries,
 } from '@/hooks/useFleetJourney';
 
-// Fills for the overlay on the price chart. Raised from ~8% to 18-22%
-// so NORMAL / LOW_VOL are actually visible (previously indistinguishable).
-// Hues chosen for distinguishability even under low saturation:
-//   NORMAL   — indigo/blue
-//   LOW_VOL  — teal (NOT green, which is too close to blue at low alpha)
-//   ELEVATED — amber
-//   CRISIS   — red
-const REGIME_BAND_FILL: Record<string, string> = {
-  '1': 'rgba(99,102,241,0.18)',    // indigo — NORMAL
-  '2': 'rgba(20,184,166,0.18)',    // teal — LOW_VOL (more distinct from blue than green was)
-  '3': 'rgba(234,179,8,0.22)',     // amber — ELEVATED_VOL
-  '4': 'rgba(239,68,68,0.26)',     // red — CRISIS
-  default: 'rgba(156,163,175,0.10)',
+// 16-state composite palette: "market.stress".
+// Market axis drives HUE, stress axis drives LIGHTNESS/SATURATION.
+// One axis per dimension means customers learn "4×4 = 16" mentally.
+//
+// MARKET    → HUE
+//   bull     → green (140°)
+//   bear     → red   (0°)
+//   sideways → blue  (220°)
+//   transition → amber (38°)
+//
+// STRESS    → LIGHTNESS (lighter = calmer)
+//   calm     → 70% light
+//   normal   → 55%
+//   elevated → 42%
+//   crisis   → 30%
+
+const MARKET_HUE: Record<string, number> = {
+  bull: 140,
+  bear: 0,
+  sideways: 220,
+  transition: 38,
+};
+const STRESS_LIGHT: Record<string, number> = {
+  calm: 70,
+  normal: 55,
+  elevated: 42,
+  crisis: 30,
+};
+const STRESS_SAT: Record<string, number> = {
+  calm: 45,
+  normal: 55,
+  elevated: 65,
+  crisis: 75,
 };
 
-// Solid variants for the regime ribbon strip (above the chart) + legend
-// swatches. Same hues, full saturation.
-const REGIME_RIBBON_FILL: Record<string, string> = {
-  '1': '#6366f1',
-  '2': '#14b8a6',
-  '3': '#eab308',
-  '4': '#ef4444',
-  default: '#94a3b8',
-};
+function regimeColor(regime: string | null | undefined, alpha = 1): string {
+  if (!regime) return `rgba(156,163,175,${(alpha * 0.6).toFixed(2)})`;
+  // Handle legacy numeric keys by projecting to sideways.*
+  const key = /^\d+$/.test(regime)
+    ? ({ '0': 'sideways.calm', '1': 'sideways.normal', '2': 'sideways.elevated', '3': 'sideways.crisis', '4': 'sideways.crisis' }[regime] ?? 'sideways.normal')
+    : regime;
+  const [market, stress] = key.split('.') as [string, string];
+  const h = MARKET_HUE[market] ?? 220;
+  const s = STRESS_SAT[stress] ?? 45;
+  const l = STRESS_LIGHT[stress] ?? 55;
+  if (alpha >= 1) return `hsl(${h}, ${s}%, ${l}%)`;
+  return `hsla(${h}, ${s}%, ${l}%, ${alpha.toFixed(2)})`;
+}
 
-const REGIME_LABEL: Record<string, string> = {
-  '1': 'NORMAL',
-  '2': 'LOW_VOL',
-  '3': 'ELEVATED_VOL',
-  '4': 'CRISIS',
-};
+function regimeLabel(regime: string | null | undefined): string {
+  if (!regime) return '—';
+  if (/^\d+$/.test(regime)) {
+    return ({ '0': 'LOW_VOL', '1': 'NORMAL', '2': 'LOW_VOL', '3': 'ELEVATED_VOL', '4': 'CRISIS' }[regime] ?? regime);
+  }
+  if (!regime.includes('.')) return regime.toUpperCase();
+  const [m, s] = regime.split('.');
+  return `${m.toUpperCase()} · ${s.toUpperCase()}`;
+}
+
+function regimeShortLabel(regime: string | null | undefined): string {
+  if (!regime) return '—';
+  if (!regime.includes('.')) return regime.toUpperCase();
+  const [m, s] = regime.split('.');
+  // Short form for tight ribbon segments: "BULL/CALM"
+  return `${m.slice(0, 4).toUpperCase()}/${s.slice(0, 4).toUpperCase()}`;
+}
 
 interface RegimeBand {
   start: string;
@@ -106,6 +141,20 @@ export function ReferencePriceChart({
     () => (effectiveData ? compressRegimeBands(effectiveData.points) : []),
     [effectiveData],
   );
+
+  const tickerBands = useMemo(() => {
+    if (!effectiveData) return [];
+    return compressRegimeBands(
+      effectiveData.ticker_regime.map((p) => ({ date: p.date, regime: p.regime })),
+    );
+  }, [effectiveData]);
+
+  const sectorBands = useMemo(() => {
+    if (!effectiveData) return [];
+    return compressRegimeBands(
+      effectiveData.sector_regime.map((p) => ({ date: p.date, regime: p.regime })),
+    );
+  }, [effectiveData]);
 
   const coverage = useMemo(() => {
     if (!effectiveData || effectiveData.points.length === 0) {
@@ -164,14 +213,38 @@ export function ReferencePriceChart({
           </div>
         ) : (
           <>
-            {/* Regime ribbon — always visible caption above the price chart.
-                Labels each regime segment so even subtle background bands are
-                unambiguous. */}
-            <RegimeRibbon
-              bands={bands}
-              firstDate={effectiveData.points[0]?.date}
-              lastDate={effectiveData.points[effectiveData.points.length - 1]?.date}
-            />
+            {/* Three stacked regime ribbons — macro (market-wide) / sector /
+                ticker — aligned to the price chart below. Customers asked for
+                ticker-scoped regime directly (it's what they intuitively care
+                about), with sector context so they know whether the ticker's
+                state is idiosyncratic or shared by its peers. */}
+            <div className="space-y-1.5">
+              <RegimeRibbon
+                title="Market regime (macro)"
+                subtitle="market-wide composite from the hierarchical detector"
+                bands={bands}
+                firstDate={effectiveData.points[0]?.date}
+                lastDate={effectiveData.points[effectiveData.points.length - 1]?.date}
+              />
+              <RegimeRibbon
+                title={`Sector regime${effectiveData.sector ? ' — ' + effectiveData.sector : ''}`}
+                subtitle={
+                  effectiveData.sector_proxy_ticker
+                    ? `derived from ${effectiveData.sector_proxy_ticker} proxy`
+                    : undefined
+                }
+                bands={sectorBands}
+                firstDate={effectiveData.points[0]?.date}
+                lastDate={effectiveData.points[effectiveData.points.length - 1]?.date}
+              />
+              <RegimeRibbon
+                title={`Ticker regime — ${effectiveData.ticker}`}
+                subtitle="derived from this ticker's own vol + trend"
+                bands={tickerBands}
+                firstDate={effectiveData.points[0]?.date}
+                lastDate={effectiveData.points[effectiveData.points.length - 1]?.date}
+              />
+            </div>
 
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -201,9 +274,9 @@ export function ReferencePriceChart({
                       key={`band-${i}`}
                       x1={b.start}
                       x2={b.end}
-                      fill={REGIME_BAND_FILL[b.regime] ?? REGIME_BAND_FILL.default}
+                      fill={regimeColor(b.regime, 0.18)}
                       fillOpacity={1}
-                      stroke={REGIME_RIBBON_FILL[b.regime] ?? REGIME_RIBBON_FILL.default}
+                      stroke={regimeColor(b.regime, 1)}
                       strokeOpacity={0.35}
                       strokeDasharray="2 4"
                     />
@@ -328,19 +401,19 @@ function RegimeLegend({ bands }: { bands: RegimeBand[] }) {
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px]">
       <span className="font-semibold uppercase tracking-widest text-muted-foreground">
-        Regimes observed
+        Market regimes observed
       </span>
       {regimes.map(([regime, days]) => (
         <span key={regime} className="flex items-center gap-1.5">
           <span
             className="h-3 w-4 rounded-sm border"
             style={{
-              backgroundColor: REGIME_RIBBON_FILL[regime] ?? REGIME_RIBBON_FILL.default,
+              backgroundColor: regimeColor(regime, 1),
               borderColor: 'hsl(var(--border))',
             }}
           />
           <span className="font-semibold text-foreground">
-            {REGIME_LABEL[regime] ?? regime}
+            {regimeLabel(regime)}
           </span>
           <span className="font-mono text-muted-foreground">{days}d</span>
         </span>
@@ -350,24 +423,47 @@ function RegimeLegend({ bands }: { bands: RegimeBand[] }) {
 }
 
 /**
- * Regime ribbon: a thick solid-colored strip rendered directly above
- * the price chart. Each regime band is drawn as a labeled segment
- * proportional to its duration. Even when the background shading on
- * the chart is subtle, the ribbon is unmissable.
+ * Regime ribbon: a solid-colored strip rendered above the price chart.
+ * Stacked 3-high (market / sector / ticker) so customers see all three
+ * layers aligned at a glance. Each regime period labeled inline; pre-
+ * and post-observation gaps rendered as muted neutral blocks.
  */
 function RegimeRibbon({
+  title,
+  subtitle,
   bands,
   firstDate,
   lastDate,
 }: {
+  title: string;
+  subtitle?: string;
   bands: RegimeBand[];
   firstDate: string | undefined;
   lastDate: string | undefined;
 }) {
-  if (bands.length === 0 || !firstDate || !lastDate) return null;
+  if (!firstDate || !lastDate) return null;
   const winStart = new Date(firstDate).getTime();
   const winEnd = new Date(lastDate).getTime();
   const winSpan = Math.max(1, winEnd - winStart);
+
+  // Handle empty-bands case (sector or ticker with too little history)
+  if (bands.length === 0) {
+    return (
+      <div className="space-y-0.5">
+        <div className="flex items-baseline gap-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          {title}
+          {subtitle && (
+            <span className="normal-case font-normal text-muted-foreground/70">
+              · {subtitle}
+            </span>
+          )}
+        </div>
+        <div className="flex h-5 w-full items-center justify-center rounded border bg-muted text-[9px] font-mono text-muted-foreground">
+          no regime data — ticker may not have enough history
+        </div>
+      </div>
+    );
+  }
 
   const firstBand = bands[0];
   const lastBand = bands[bands.length - 1];
@@ -378,22 +474,23 @@ function RegimeRibbon({
   const postPct = Math.max(0, ((winEnd - bandEnd) / winSpan) * 100);
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        Regime timeline
-        <span className="font-normal text-muted-foreground/70">
-          · each block is a regime period ({firstDate} → {lastDate})
-        </span>
+    <div className="space-y-0.5">
+      <div className="flex items-baseline gap-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {title}
+        {subtitle && (
+          <span className="normal-case font-normal text-muted-foreground/70">
+            · {subtitle}
+          </span>
+        )}
       </div>
-      <div className="flex h-6 w-full items-stretch overflow-hidden rounded-md border">
-        {/* Pre-observation gap (no regime data collected here) */}
+      <div className="flex h-6 w-full items-stretch overflow-hidden rounded border">
         {prePct > 0.5 && (
           <div
             className="flex items-center justify-center bg-muted text-[9px] font-mono text-muted-foreground"
             style={{ width: `${prePct}%` }}
             title="No regime data before first observation"
           >
-            {prePct > 8 ? 'no regime data' : ''}
+            {prePct > 10 ? 'no regime data' : ''}
           </div>
         )}
         {bands.map((b, i) => {
@@ -402,29 +499,34 @@ function RegimeRibbon({
           const pct = ((segEnd - segStart) / winSpan) * 100;
           const days =
             Math.floor((segEnd - segStart) / (24 * 3600 * 1000)) + 1;
-          const color = REGIME_RIBBON_FILL[b.regime] ?? REGIME_RIBBON_FILL.default;
-          const label = REGIME_LABEL[b.regime] ?? b.regime;
+          const fillColor = regimeColor(b.regime, 1);
+          const longLabel = regimeLabel(b.regime);
+          const shortLabel = regimeShortLabel(b.regime);
           return (
             <div
               key={i}
               className="flex items-center justify-center text-[9px] font-mono font-semibold text-white"
               style={{
                 width: `${Math.max(0.5, pct)}%`,
-                backgroundColor: color,
-                borderLeft: i === 0 ? undefined : '1px solid rgba(0,0,0,0.2)',
+                backgroundColor: fillColor,
+                borderLeft: i === 0 ? undefined : '1px solid rgba(0,0,0,0.25)',
               }}
-              title={`${label} · ${b.start} → ${b.end} (${days}d)`}
+              title={`${longLabel} · ${b.start} → ${b.end} (${days}d)`}
             >
-              {pct > 6 ? `${label} ${days}d` : pct > 3 ? label : ''}
+              {pct > 10
+                ? `${longLabel} ${days}d`
+                : pct > 5
+                  ? shortLabel
+                  : pct > 2
+                    ? shortLabel.slice(0, 1)
+                    : ''}
             </div>
           );
         })}
-        {/* Post-observation gap (if the last band ends before end-of-window) */}
         {postPct > 0.5 && (
           <div
             className="flex items-center justify-center bg-muted text-[9px] font-mono text-muted-foreground"
             style={{ width: `${postPct}%` }}
-            title="No regime data after last observation"
           />
         )}
       </div>

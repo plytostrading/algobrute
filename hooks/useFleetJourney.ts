@@ -182,7 +182,13 @@ export interface StrategyAllocationPoint {
 export interface ReferencePricePoint {
   date: string;
   close: number;
+  /** Market-wide (macro) composite regime key, e.g. "bear.elevated". */
   regime: string | null;
+}
+
+export interface TickerRegimePoint {
+  date: string;
+  regime: string;
 }
 
 export interface ReferencePriceSeries {
@@ -190,6 +196,14 @@ export interface ReferencePriceSeries {
   /** "fleet_most_traded" | "fleet_first_bot" | "default_spy" | "picker" */
   source: string;
   points: ReferencePricePoint[];
+  /** Ticker-scoped regime series derived from THIS ticker's OHLCV. */
+  ticker_regime: TickerRegimePoint[];
+  /** Sector name, e.g. "Technology". None when unknown. */
+  sector: string | null;
+  /** Proxy ETF used to derive the sector regime (XLK / XLE / etc.). */
+  sector_proxy_ticker: string | null;
+  /** Sector-scoped regime series from the proxy ETF's OHLCV. */
+  sector_regime: TickerRegimePoint[];
 }
 
 // ── Density-boosting additions for 6-chapter redesign ──
