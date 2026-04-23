@@ -92,6 +92,37 @@ function regimeShortLabel(regime: string | null | undefined): string {
   return `${m.slice(0, 4).toUpperCase()}/${s.slice(0, 4).toUpperCase()}`;
 }
 
+// Plain-English descriptions shown in tooltips. Grounded in trading semantics
+// so customers can interpret what the state actually means for behavior.
+const REGIME_DESCRIPTIONS: Record<string, string> = {
+  'bull.calm': 'Trending up in calm conditions — stable uptrend.',
+  'bull.normal': 'Trending up at typical volatility — healthy uptrend.',
+  'bull.elevated': 'Trending up with elevated vol — choppy but upward.',
+  'bull.crisis': 'Trending up in crisis vol — rare; often short-covering.',
+  'bear.calm': 'Trending down in calm conditions — orderly selloff.',
+  'bear.normal': 'Trending down at typical vol — sustained selling.',
+  'bear.elevated': 'Trending down with elevated vol — accelerating decline.',
+  'bear.crisis': 'Trending down with crisis vol — severe risk-off / panic.',
+  'sideways.calm': 'Range-bound in calm conditions — low-risk consolidation.',
+  'sideways.normal': 'Range-bound at typical vol — uncommitted market.',
+  'sideways.elevated': 'Range-bound with elevated vol — indecisive but jumpy.',
+  'sideways.crisis': 'Range-bound with crisis vol — violent chop, no direction.',
+  'transition.calm': 'Regime transition in calm conditions — character shift.',
+  'transition.normal': 'Regime transition at typical vol — shift underway.',
+  'transition.elevated': 'Regime transition under stress — volatile shift.',
+  'transition.crisis': 'Regime transition in crisis — violent regime flip.',
+};
+
+function regimeDescription(regime: string | null | undefined): string {
+  if (!regime) return 'No regime data available at this date.';
+  return REGIME_DESCRIPTIONS[regime] ?? 'Regime description not available.';
+}
+
+// Sanitize a regime key for use as a Recharts dataKey (no dots/spaces).
+function regimeKeyId(regime: string): string {
+  return regime.replace(/[^a-z0-9]/gi, '_');
+}
+
 interface RegimeBand {
   start: string;
   end: string;
@@ -156,6 +187,49 @@ export function ReferencePriceChart({
     );
   }, [effectiveData]);
 
+  // Lookup maps for ticker + sector regime at each date (for tooltip).
+  const tickerRegimeByDate = useMemo(() => {
+    const m = new Map<string, string>();
+    effectiveData?.ticker_regime.forEach((p) => m.set(p.date, p.regime));
+    return m;
+  }, [effectiveData]);
+  const sectorRegimeByDate = useMemo(() => {
+    const m = new Map<string, string>();
+    effectiveData?.sector_regime.forEach((p) => m.set(p.date, p.regime));
+    return m;
+  }, [effectiveData]);
+
+  // Build per-regime line data: each row has close_{regime} where regime
+  // is the macro regime at that date. Only the matching field is non-null
+  // so Recharts draws each regime's line only on its dates. Boundary
+  // points appear in both regimes so line segments meet without gaps.
+  const { chartRows, usedRegimes } = useMemo(() => {
+    if (!effectiveData) return { chartRows: [], usedRegimes: [] as string[] };
+    const points = effectiveData.points;
+    const regimeSet = new Set<string>();
+    const rows: Array<Record<string, string | number | null>> = [];
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const regime = p.regime ?? 'unknown';
+      regimeSet.add(regime);
+      const row: Record<string, string | number | null> = {
+        date: p.date,
+        close: p.close,
+        regime,
+        ticker_regime: tickerRegimeByDate.get(p.date) ?? null,
+        sector_regime: sectorRegimeByDate.get(p.date) ?? null,
+      };
+      row[`close_${regimeKeyId(regime)}`] = p.close;
+      // Also fill the previous regime's field on this boundary so lines join.
+      const prev = i > 0 ? points[i - 1].regime : null;
+      if (prev && prev !== regime) {
+        row[`close_${regimeKeyId(prev)}`] = p.close;
+      }
+      rows.push(row);
+    }
+    return { chartRows: rows, usedRegimes: Array.from(regimeSet) };
+  }, [effectiveData, tickerRegimeByDate, sectorRegimeByDate]);
+
   const coverage = useMemo(() => {
     if (!effectiveData || effectiveData.points.length === 0) {
       return null;
@@ -185,11 +259,10 @@ export function ReferencePriceChart({
             </CardTitle>
             <CardDescription>
               Real close prices over the same window as your fleet journey.
-              The <strong>regime ribbon</strong> above the chart shows each
-              regime period as a labeled solid block, and the chart background
-              tints the corresponding period with the same color. Regime is{' '}
-              <strong>market-wide</strong> — derived from macro conditions —
-              so the ribbon is the same across every ticker in the picker.
+              The <strong>price line itself is colored by the market regime</strong>{' '}
+              at each date, with inline regime tags above the segments and
+              a descriptive tooltip on hover showing the ticker regime,
+              sector regime, and macro regime together.
             </CardDescription>
           </div>
 
@@ -213,11 +286,10 @@ export function ReferencePriceChart({
           </div>
         ) : (
           <>
-            {/* Three stacked regime ribbons — macro (market-wide) / sector /
-                ticker — aligned to the price chart below. Customers asked for
-                ticker-scoped regime directly (it's what they intuitively care
-                about), with sector context so they know whether the ticker's
-                state is idiosyncratic or shared by its peers. */}
+            {/* Two context ribbons — macro + sector — aligned to the price
+                chart below. The ticker's own regime is shown directly ON the
+                price line via per-segment coloring (see LineChart below) and
+                in the hover tooltip. */}
             <div className="space-y-1.5">
               <RegimeRibbon
                 title="Market regime (macro)"
@@ -237,23 +309,13 @@ export function ReferencePriceChart({
                 firstDate={effectiveData.points[0]?.date}
                 lastDate={effectiveData.points[effectiveData.points.length - 1]?.date}
               />
-              <RegimeRibbon
-                title={`Ticker regime — ${effectiveData.ticker}`}
-                subtitle="derived from this ticker's own vol + trend"
-                bands={tickerBands}
-                firstDate={effectiveData.points[0]?.date}
-                lastDate={effectiveData.points[effectiveData.points.length - 1]?.date}
-              />
             </div>
 
-            <div className="h-64">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={effectiveData.points.map((p) => ({
-                    date: p.date,
-                    close: p.close,
-                  }))}
-                  margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
+                  data={chartRows}
+                  margin={{ top: 20, right: 20, bottom: 10, left: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
@@ -269,38 +331,55 @@ export function ReferencePriceChart({
                     domain={['auto', 'auto']}
                   />
 
+                  {/* Background regime shading with inline labels so the
+                      regime name is visible without hovering. */}
                   {bands.map((b, i) => (
                     <ReferenceArea
                       key={`band-${i}`}
                       x1={b.start}
                       x2={b.end}
-                      fill={regimeColor(b.regime, 0.18)}
+                      fill={regimeColor(b.regime, 0.12)}
                       fillOpacity={1}
                       stroke={regimeColor(b.regime, 1)}
-                      strokeOpacity={0.35}
+                      strokeOpacity={0.25}
                       strokeDasharray="2 4"
+                      label={{
+                        value: regimeShortLabel(b.regime),
+                        position: 'insideTop',
+                        fontSize: 10,
+                        fontFamily: 'ui-monospace, monospace',
+                        fill: regimeColor(b.regime, 1),
+                        fontWeight: 600,
+                      }}
                     />
                   ))}
 
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--popover))',
-                      borderColor: 'hsl(var(--border))',
-                      fontSize: 12,
-                    }}
-                    formatter={(v: unknown) => [
-                      typeof v === 'number' ? `$${v.toFixed(2)}` : String(v),
-                      'Close',
-                    ]}
+                    content={
+                      <PriceChartTooltip
+                        sectorName={effectiveData.sector}
+                        sectorProxy={effectiveData.sector_proxy_ticker}
+                        ticker={effectiveData.ticker}
+                      />
+                    }
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="close"
-                    stroke="#0ea5e9"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
+
+                  {/* One <Line> per macro regime present in the window. Each
+                      renders only on its own dates (null elsewhere) so the
+                      colored segments line up with the regime bands. */}
+                  {usedRegimes.map((regime) => (
+                    <Line
+                      key={regime}
+                      type="monotone"
+                      dataKey={`close_${regimeKeyId(regime)}`}
+                      name={regimeLabel(regime)}
+                      stroke={regimeColor(regime, 1)}
+                      strokeWidth={2.4}
+                      dot={false}
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -354,6 +433,105 @@ function TickerPicker({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Rich tooltip for the price chart. Unlike the default Recharts
+ * tooltip, this one picks the single non-null `close_*` value (the
+ * active regime's close) and enriches it with:
+ *   • the market (macro) regime label + description
+ *   • the ticker regime label + description
+ *   • the sector regime label + description
+ *
+ * The three layers answer, in order: "what's this ticker doing?", "is
+ * its sector doing the same?", and "is the macro market backing it?".
+ */
+function PriceChartTooltip({
+  active,
+  payload,
+  label,
+  sectorName,
+  sectorProxy,
+  ticker,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: Record<string, string | number | null> }>;
+  label?: string;
+  sectorName?: string | null;
+  sectorProxy?: string | null;
+  ticker?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  const close = typeof row.close === 'number' ? row.close : null;
+  const marketRegime = typeof row.regime === 'string' ? row.regime : null;
+  const tickerRegime = typeof row.ticker_regime === 'string' ? row.ticker_regime : null;
+  const sectorRegime = typeof row.sector_regime === 'string' ? row.sector_regime : null;
+
+  return (
+    <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md">
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <span className="font-mono text-foreground">{label}</span>
+        {close !== null && (
+          <span className="font-mono font-semibold text-foreground">
+            ${close.toFixed(2)}
+          </span>
+        )}
+      </div>
+      <div className="space-y-1.5 border-t pt-1.5">
+        <RegimeTooltipRow
+          scope="Market"
+          subtitle="macro hierarchical detector"
+          regime={marketRegime}
+        />
+        <RegimeTooltipRow
+          scope={sectorName ? `Sector · ${sectorName}` : 'Sector'}
+          subtitle={sectorProxy ? `from ${sectorProxy} proxy` : undefined}
+          regime={sectorRegime}
+        />
+        <RegimeTooltipRow
+          scope={ticker ? `Ticker · ${ticker}` : 'Ticker'}
+          subtitle="derived from this ticker's vol + trend"
+          regime={tickerRegime}
+        />
+      </div>
+    </div>
+  );
+}
+
+function RegimeTooltipRow({
+  scope,
+  subtitle,
+  regime,
+}: {
+  scope: string;
+  subtitle?: string;
+  regime: string | null;
+}) {
+  const color = regimeColor(regime, 1);
+  const label = regimeLabel(regime);
+  const desc = regimeDescription(regime);
+  return (
+    <div className="flex gap-2">
+      <span
+        className="mt-[3px] h-2 w-2 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <div className="flex-1 space-y-0.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {scope}
+          </span>
+          <span className="font-mono font-semibold text-foreground">{label}</span>
+        </div>
+        {subtitle && (
+          <div className="text-[10px] text-muted-foreground/80">{subtitle}</div>
+        )}
+        <div className="text-[11px] text-foreground/90">{desc}</div>
+      </div>
     </div>
   );
 }
