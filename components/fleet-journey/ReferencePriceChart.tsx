@@ -199,35 +199,59 @@ export function ReferencePriceChart({
     return m;
   }, [effectiveData]);
 
-  // Build per-regime line data: each row has close_{regime} where regime
-  // is the macro regime at that date. Only the matching field is non-null
-  // so Recharts draws each regime's line only on its dates. Boundary
-  // points appear in both regimes so line segments meet without gaps.
+  // Build per-segment line data: each row has close_{regime} where regime
+  // is the **TICKER's own regime** at that date (falling back to the macro
+  // regime when the ticker regime isn't available). The price line is a
+  // ticker-specific story, so it should be colored by the ticker's state,
+  // not by the market-wide macro state. Only the matching field is non-null
+  // so Recharts draws each regime's line only on its dates; boundary points
+  // appear in both regimes so line segments meet without gaps.
+  //
+  // ``row.regime`` is intentionally kept as the MACRO regime so the tooltip's
+  // "Market" row continues to read it directly (see PriceChartTooltip below).
   const { chartRows, usedRegimes } = useMemo(() => {
     if (!effectiveData) return { chartRows: [], usedRegimes: [] as string[] };
     const points = effectiveData.points;
-    const regimeSet = new Set<string>();
+    const segmentRegimeSet = new Set<string>();
     const rows: Array<Record<string, string | number | null>> = [];
+
+    function segmentRegimeForDate(
+      date: string,
+      macro: string | null | undefined,
+    ): string {
+      // Prefer the ticker's own regime; fall back to macro when the
+      // ticker regime isn't yet available (sparse early-period coverage
+      // from the per-ticker inference pipeline).
+      return tickerRegimeByDate.get(date) ?? macro ?? 'unknown';
+    }
+
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      const regime = p.regime ?? 'unknown';
-      regimeSet.add(regime);
+      const macroRegime = p.regime ?? 'unknown';
+      const segmentRegime = segmentRegimeForDate(p.date, p.regime);
+      segmentRegimeSet.add(segmentRegime);
       const row: Record<string, string | number | null> = {
         date: p.date,
         close: p.close,
-        regime,
+        regime: macroRegime, // tooltip's Market row reads this
         ticker_regime: tickerRegimeByDate.get(p.date) ?? null,
         sector_regime: sectorRegimeByDate.get(p.date) ?? null,
       };
-      row[`close_${regimeKeyId(regime)}`] = p.close;
-      // Also fill the previous regime's field on this boundary so lines join.
-      const prev = i > 0 ? points[i - 1].regime : null;
-      if (prev && prev !== regime) {
-        row[`close_${regimeKeyId(prev)}`] = p.close;
+      row[`close_${regimeKeyId(segmentRegime)}`] = p.close;
+      // Fill the previous segment regime's field on boundary so lines join.
+      if (i > 0) {
+        const prevPoint = points[i - 1];
+        const prevSegmentRegime = segmentRegimeForDate(
+          prevPoint.date,
+          prevPoint.regime,
+        );
+        if (prevSegmentRegime !== segmentRegime) {
+          row[`close_${regimeKeyId(prevSegmentRegime)}`] = p.close;
+        }
       }
       rows.push(row);
     }
-    return { chartRows: rows, usedRegimes: Array.from(regimeSet) };
+    return { chartRows: rows, usedRegimes: Array.from(segmentRegimeSet) };
   }, [effectiveData, tickerRegimeByDate, sectorRegimeByDate]);
 
   const coverage = useMemo(() => {
@@ -259,10 +283,13 @@ export function ReferencePriceChart({
             </CardTitle>
             <CardDescription>
               Real close prices over the same window as your fleet journey.
-              The <strong>price line itself is colored by the market regime</strong>{' '}
-              at each date, with inline regime tags above the segments and
-              a descriptive tooltip on hover showing the ticker regime,
-              sector regime, and macro regime together.
+              The <strong>price line is colored by the ticker&apos;s own regime</strong>{' '}
+              at each date — each segment reflects the state of this specific
+              ticker (trending up, sideways, choppy, crisis, etc.), not the
+              market as a whole. The shaded <strong>backdrop</strong> shows
+              the market-wide (macro) regime as context, with inline tags
+              above each macro band. Hover the line for a tooltip that lists
+              ticker, sector, and macro regimes together.
             </CardDescription>
           </div>
 
@@ -364,9 +391,11 @@ export function ReferencePriceChart({
                     }
                   />
 
-                  {/* One <Line> per macro regime present in the window. Each
-                      renders only on its own dates (null elsewhere) so the
-                      colored segments line up with the regime bands. */}
+                  {/* One <Line> per ticker regime present in the window.
+                      Each renders only on its own dates (null elsewhere),
+                      so the colored segments reflect the ticker's own
+                      regime at each date. The macro backdrop above is a
+                      separate axis of context. */}
                   {usedRegimes.map((regime) => (
                     <Line
                       key={regime}
@@ -384,7 +413,11 @@ export function ReferencePriceChart({
               </ResponsiveContainer>
             </div>
 
-            <RegimeLegend bands={bands} />
+            <RegimeLegend
+              title="Ticker regimes observed"
+              bands={tickerBands}
+            />
+            <RegimeLegend title="Market regimes observed" bands={bands} />
 
             {coverage && coverage.pct < 100 && (
               <div className="text-[11px] text-muted-foreground">
@@ -562,7 +595,13 @@ function compressRegimeBands(
   return bands;
 }
 
-function RegimeLegend({ bands }: { bands: RegimeBand[] }) {
+function RegimeLegend({
+  title = 'Market regimes observed',
+  bands,
+}: {
+  title?: string;
+  bands: RegimeBand[];
+}) {
   const counts = new Map<string, number>();
   for (const b of bands) {
     const days = Math.max(
@@ -579,7 +618,7 @@ function RegimeLegend({ bands }: { bands: RegimeBand[] }) {
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px]">
       <span className="font-semibold uppercase tracking-widest text-muted-foreground">
-        Market regimes observed
+        {title}
       </span>
       {regimes.map(([regime, days]) => (
         <span key={regime} className="flex items-center gap-1.5">
