@@ -193,6 +193,32 @@ export function ReferencePriceChart({
     effectiveData?.ticker_regime.forEach((p) => m.set(p.date, p.regime));
     return m;
   }, [effectiveData]);
+  // Posterior + next-posterior + confidence lookups for the ticker
+  // regime — exposed in the tooltip so a user debugging a visually-
+  // surprising label can see the classifier's full uncertainty (e.g.,
+  // "labeled bear at 0.62 confidence, but posterior has 33% bull —
+  // prior is dragging this").
+  const tickerPosteriorByDate = useMemo(() => {
+    const m = new Map<string, Record<string, number>>();
+    effectiveData?.ticker_regime.forEach((p) => {
+      if (p.posterior) m.set(p.date, p.posterior);
+    });
+    return m;
+  }, [effectiveData]);
+  const tickerNextPosteriorByDate = useMemo(() => {
+    const m = new Map<string, Record<string, number>>();
+    effectiveData?.ticker_regime.forEach((p) => {
+      if (p.next_posterior) m.set(p.date, p.next_posterior);
+    });
+    return m;
+  }, [effectiveData]);
+  const tickerConfidenceByDate = useMemo(() => {
+    const m = new Map<string, number>();
+    effectiveData?.ticker_regime.forEach((p) => {
+      if (typeof p.confidence === 'number') m.set(p.date, p.confidence);
+    });
+    return m;
+  }, [effectiveData]);
   const sectorRegimeByDate = useMemo(() => {
     const m = new Map<string, string>();
     effectiveData?.sector_regime.forEach((p) => m.set(p.date, p.regime));
@@ -213,7 +239,14 @@ export function ReferencePriceChart({
     if (!effectiveData) return { chartRows: [], usedRegimes: [] as string[] };
     const points = effectiveData.points;
     const segmentRegimeSet = new Set<string>();
-    const rows: Array<Record<string, string | number | null>> = [];
+    // Row values include primitives + posterior dicts; Recharts treats
+    // data as `Record<string, unknown>` so the widening is safe.
+    type RowValue =
+      | string
+      | number
+      | null
+      | Record<string, number>;
+    const rows: Array<Record<string, RowValue>> = [];
 
     function segmentRegimeForDate(
       date: string,
@@ -230,11 +263,14 @@ export function ReferencePriceChart({
       const macroRegime = p.regime ?? 'unknown';
       const segmentRegime = segmentRegimeForDate(p.date, p.regime);
       segmentRegimeSet.add(segmentRegime);
-      const row: Record<string, string | number | null> = {
+      const row: Record<string, RowValue> = {
         date: p.date,
         close: p.close,
         regime: macroRegime, // tooltip's Market row reads this
         ticker_regime: tickerRegimeByDate.get(p.date) ?? null,
+        ticker_posterior: tickerPosteriorByDate.get(p.date) ?? null,
+        ticker_next_posterior: tickerNextPosteriorByDate.get(p.date) ?? null,
+        ticker_confidence: tickerConfidenceByDate.get(p.date) ?? null,
         sector_regime: sectorRegimeByDate.get(p.date) ?? null,
       };
       row[`close_${regimeKeyId(segmentRegime)}`] = p.close;
@@ -252,7 +288,14 @@ export function ReferencePriceChart({
       rows.push(row);
     }
     return { chartRows: rows, usedRegimes: Array.from(segmentRegimeSet) };
-  }, [effectiveData, tickerRegimeByDate, sectorRegimeByDate]);
+  }, [
+    effectiveData,
+    tickerRegimeByDate,
+    tickerPosteriorByDate,
+    tickerNextPosteriorByDate,
+    tickerConfidenceByDate,
+    sectorRegimeByDate,
+  ]);
 
   const coverage = useMemo(() => {
     if (!effectiveData || effectiveData.points.length === 0) {
@@ -490,7 +533,12 @@ function PriceChartTooltip({
   ticker,
 }: {
   active?: boolean;
-  payload?: Array<{ payload?: Record<string, string | number | null> }>;
+  payload?: Array<{
+    payload?: Record<
+      string,
+      string | number | null | Record<string, number>
+    >;
+  }>;
   label?: string;
   sectorName?: string | null;
   sectorProxy?: string | null;
@@ -501,8 +549,18 @@ function PriceChartTooltip({
   if (!row) return null;
   const close = typeof row.close === 'number' ? row.close : null;
   const marketRegime = typeof row.regime === 'string' ? row.regime : null;
-  const tickerRegime = typeof row.ticker_regime === 'string' ? row.ticker_regime : null;
-  const sectorRegime = typeof row.sector_regime === 'string' ? row.sector_regime : null;
+  const tickerRegime =
+    typeof row.ticker_regime === 'string' ? row.ticker_regime : null;
+  const sectorRegime =
+    typeof row.sector_regime === 'string' ? row.sector_regime : null;
+  const tickerPosterior = isPosteriorDict(row.ticker_posterior)
+    ? row.ticker_posterior
+    : null;
+  const tickerNextPosterior = isPosteriorDict(row.ticker_next_posterior)
+    ? row.ticker_next_posterior
+    : null;
+  const tickerConfidence =
+    typeof row.ticker_confidence === 'number' ? row.ticker_confidence : null;
 
   return (
     <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md">
@@ -529,9 +587,23 @@ function PriceChartTooltip({
           scope={ticker ? `Ticker · ${ticker}` : 'Ticker'}
           subtitle="derived from this ticker's vol + trend"
           regime={tickerRegime}
+          confidence={tickerConfidence}
+          posterior={tickerPosterior}
+          nextPosterior={tickerNextPosterior}
         />
       </div>
     </div>
+  );
+}
+
+function isPosteriorDict(
+  v: unknown,
+): v is Record<string, number> {
+  if (v === null || typeof v !== 'object') return false;
+  // Expect the four market states as keys; accept any dict-of-numbers
+  // gracefully — the renderer below tolerates missing keys.
+  return Object.values(v as Record<string, unknown>).every(
+    (x) => typeof x === 'number' && Number.isFinite(x),
   );
 }
 
@@ -539,10 +611,16 @@ function RegimeTooltipRow({
   scope,
   subtitle,
   regime,
+  confidence,
+  posterior,
+  nextPosterior,
 }: {
   scope: string;
   subtitle?: string;
   regime: string | null;
+  confidence?: number | null;
+  posterior?: Record<string, number> | null;
+  nextPosterior?: Record<string, number> | null;
 }) {
   const color = regimeColor(regime, 1);
   const label = regimeLabel(regime);
@@ -559,12 +637,77 @@ function RegimeTooltipRow({
             {scope}
           </span>
           <span className="font-mono font-semibold text-foreground">{label}</span>
+          {typeof confidence === 'number' && (
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {(confidence * 100).toFixed(0)}%
+            </span>
+          )}
         </div>
         {subtitle && (
           <div className="text-[10px] text-muted-foreground/80">{subtitle}</div>
         )}
+        {posterior && (
+          <PosteriorStrip label="now" dist={posterior} />
+        )}
+        {nextPosterior && (
+          <PosteriorStrip label="next" dist={nextPosterior} />
+        )}
         <div className="text-[11px] text-foreground/90">{desc}</div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Posterior strip — compact visual breakdown of the classifier's
+ * probability distribution. Used in the tooltip to show both the
+ * current-bar posterior (`now`) and the next-bar predicted posterior
+ * (`next`), so the user can see:
+ *   - how confident the classifier is in the displayed label
+ *   - where the Markov prior is pulling the next bar absent new
+ *     evidence (e.g., a `bear` label with a 38% bull posterior tells
+ *     the user the regime is likely about to flip)
+ *
+ * Renders as a single horizontal stacked bar per posterior, with the
+ * largest three states labeled inline. Ordered {bull, sideways,
+ * bear, transition} so the strip reads left-to-right same as the
+ * composite-regime cell key.
+ */
+function PosteriorStrip({
+  label,
+  dist,
+}: {
+  label: string;
+  dist: Record<string, number>;
+}) {
+  const STATES = ['bull', 'sideways', 'bear', 'transition'] as const;
+  const entries = STATES.map((s) => ({ state: s, p: dist[s] ?? 0 }));
+  // Colors pinned to the macro market-axis palette so the strip reads
+  // consistently with the chart ribbons above.
+  const colorFor = (s: string) => regimeColor(`${s}.normal`, 1);
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="w-[34px] shrink-0 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <div className="flex h-[10px] flex-1 overflow-hidden rounded-sm border border-border/50">
+        {entries.map(({ state, p }) => (
+          <div
+            key={state}
+            title={`${state} ${(p * 100).toFixed(1)}%`}
+            style={{
+              width: `${(p * 100).toFixed(2)}%`,
+              backgroundColor: colorFor(state),
+            }}
+          />
+        ))}
+      </div>
+      <span className="shrink-0 font-mono text-[9px] text-muted-foreground">
+        {entries
+          .filter((e) => e.p >= 0.05)
+          .map((e) => `${e.state[0]}${(e.p * 100).toFixed(0)}`)
+          .join(' ')}
+      </span>
     </div>
   );
 }

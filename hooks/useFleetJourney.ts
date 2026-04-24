@@ -189,6 +189,22 @@ export interface ReferencePricePoint {
 export interface TickerRegimePoint {
   date: string;
   regime: string;
+  /** Max-posterior probability at label time (0..1). */
+  confidence?: number;
+  /**
+   * Current-bar posterior distribution over {bull, sideways, bear,
+   * transition}. Makes the classifier's certainty visible in the
+   * tooltip — e.g., a "bear" label at 58% bull prior / 30% bear
+   * posterior tells the user the Markov prior was doing the heavy
+   * lifting and the regime may be about to shift.
+   */
+  posterior?: Record<string, number>;
+  /**
+   * Predicted posterior for t+1 absent new evidence (= posterior ×
+   * Markov transition matrix). Exposes where the Markov stickiness
+   * is pulling the label without any fresh signal.
+   */
+  next_posterior?: Record<string, number>;
 }
 
 export interface ReferencePriceSeries {
