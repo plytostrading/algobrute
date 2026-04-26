@@ -12,6 +12,12 @@ export const queryKeys = {
     all: ['user'] as const,
     profile: ['user', 'profile'] as const,
     alpacaStatus: ['user', 'alpaca', 'status'] as const,
+    autonomyPolicy: ['user', 'autonomy', 'policy'] as const,
+  },
+  dashboard: {
+    all: ['dashboard'] as const,
+    shadowSizerSummary: (windowDays: number) =>
+      ['dashboard', 'shadow-sizer-summary', windowDays] as const,
   },
   bots: {
     all: ['bots'] as const,

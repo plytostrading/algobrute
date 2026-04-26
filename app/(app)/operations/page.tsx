@@ -8,6 +8,7 @@ import BotListRow from '@/components/operations/BotListRow';
 import BotDetailDrawer from '@/components/operations/BotDetailDrawer';
 import FleetAnalyticsSidebar from '@/components/operations/FleetAnalyticsSidebar';
 import HighCorrelationBanner from '@/components/operations/HighCorrelationBanner';
+import ShadowSizerSummaryCard from '@/components/operations/ShadowSizerSummaryCard';
 // FleetManagement and RiskDashboard are superseded by this layout but preserved as files.
 import { useFleetState } from '@/hooks/useFleetState';
 import { useFleetWeather } from '@/hooks/useFleetWeather';
@@ -100,6 +101,10 @@ export default function OperationsPage() {
           regime={weather.current_regime}
         />
       )}
+
+      {/* Posterior-aware sizer canary monitoring panel — renders only
+          when the authenticated user has opted into the canary. */}
+      <ShadowSizerSummaryCard />
 
       {/* Main layout: bot list + analytics sidebar (sidebar added in Batch 8) */}
       <div className="flex gap-6">

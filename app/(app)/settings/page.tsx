@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch, parseApiError, parseApiJson } from '@/lib/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { formatCurrency } from '@/utils/formatters';
+import AutonomySettingsCard from '@/components/settings/AutonomySettingsCard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -346,6 +347,7 @@ export default function SettingsPage() {
           <>
             <RiskProfileCard profile={profile} />
             <AlpacaCard />
+            <AutonomySettingsCard />
           </>
         )}
       </div>
