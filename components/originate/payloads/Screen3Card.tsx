@@ -7,19 +7,38 @@
  * metrics (Sharpe / Max DD / Win Rate / Total Return), trade count with
  * sample-size disclaimer, the expandable disclosures section (biases not
  * controlled + sample caveats + next step), and the "Accept Strategy"
- * CTA skeleton.
+ * CTA.
  *
- * The CTA is a SKELETON in Wave 1.B — the click handler logs the
- * intent and surfaces a toast.  Full wiring (mutation to
- * `/api/origination/strategies/{passport_id}/promote-to-deep`) lands in
- * Wave 1.C / F.1.C.
+ * F.1.C — Accept-Strategy CTA is now wired to the engine's E.1
+ * `/api/origination/strategies/{light_passport_id}/promote-to-deep`
+ * endpoint via `usePromoteToDeep()`.  The CTA enforces a confirmation
+ * gate for borderline verdicts so the customer commits compute
+ * intentionally rather than reflexively:
+ *
+ *   - LOOKS_PROMISING   → no confirmation; direct execute.
+ *   - MIXED_SIGNALS     → light confirmation.
+ *   - NOT_RECOMMENDED   → strong confirmation (commits real compute
+ *                          against a strategy the light backtest
+ *                          flagged — but the customer earns the
+ *                          choice).
+ *   - INCONCLUSIVE      → honest-disclosure confirmation; the deep
+ *                          backtest may confirm there's no edge.
+ *
+ * On 202, the button transitions to a success state for ~2.5s and
+ * then router-pushes to `/strategy/${passport_id}` (the F.2 lifecycle
+ * view; routes-not-yet-merged are tolerated — landing in parallel).
+ * On 409 ("already promoted") the button stays enabled and surfaces
+ * a tooltip + "View Lifecycle" affordance using the EXISTING
+ * `deep_job_id` from the 409 body.  All other errors surface inline
+ * with a Try Again affordance.
  *
  * Engine source: `dialogue/state.py::Screen3Payload` (the
  * light-backtest-result variant, NOT the agent-side "final draft"
  * Screen3 — see types/originate.ts for the rationale).
  */
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -28,8 +47,9 @@ import {
   ChevronDown,
   ChevronUp,
   Award,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +58,25 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  AlreadyPromotedError,
+  usePromoteToDeep,
+} from '@/hooks/usePromoteToDeep';
 import type { LightBacktestVerdict, Screen3Payload } from '@/types/originate';
 import { cn } from '@/lib/utils';
 
@@ -95,6 +134,55 @@ function verdictStyle(verdict: LightBacktestVerdict): VerdictStyle {
         badgeClassName:
           'bg-muted text-muted-foreground border-border',
         borderClassName: 'border-l-muted-foreground/40',
+      };
+  }
+}
+
+interface ConfirmationCopy {
+  title: string;
+  body: string;
+  confirmLabel: string;
+}
+
+/**
+ * Confirmation-dialog copy per verdict.  Honest-not-flattering is the
+ * design principle: the dialog tells the customer what the verdict
+ * actually says, surfaces the cost being committed, and leaves the
+ * decision with them.  LOOKS_PROMISING returns null because no
+ * confirmation is required.
+ */
+function confirmationCopy(verdict: LightBacktestVerdict): ConfirmationCopy | null {
+  switch (verdict) {
+    case 'LOOKS_PROMISING':
+      return null;
+    case 'NOT_RECOMMENDED':
+      return {
+        title: 'Run deep validation on a flagged strategy?',
+        body:
+          'The light backtest found significant concerns with this strategy. ' +
+          'The deep validation will commit real compute and may confirm the ' +
+          'concerns — but it can also catch cases where the light sample ' +
+          'mis-classified an edge.  Are you sure you want to proceed?',
+        confirmLabel: 'Run deep validation anyway',
+      };
+    case 'INCONCLUSIVE':
+      return {
+        title: 'Run deep validation on an inconclusive result?',
+        body:
+          "The light backtest sample wasn't large enough for a confident " +
+          'read. The deep validation will tell us more — but it may also ' +
+          "confirm the strategy doesn't have a real edge. Proceed?",
+        confirmLabel: 'Run deep validation',
+      };
+    case 'MIXED_SIGNALS':
+    default:
+      return {
+        title: 'Run deep validation on a mixed result?',
+        body:
+          'Some metrics look good, some don’t. The deep validation will ' +
+          'resolve which signal matters more in a much larger sample — ' +
+          'and may confirm or contradict the light verdict. Proceed?',
+        confirmLabel: 'Run deep validation',
       };
   }
 }
@@ -160,31 +248,166 @@ function classLabel(cls: string): string {
     .join(' ');
 }
 
+/**
+ * CTA state machine — explicit rather than inferring from the
+ * mutation's `isPending/isError/isSuccess` triplet because the
+ * "already_promoted" branch needs a sticky reference to the existing
+ * deep_job_id which the mutation's hook state doesn't carry forwards
+ * after the error is consumed.
+ */
+type CtaState =
+  | { kind: 'idle' }
+  | { kind: 'submitting' }
+  | { kind: 'success'; deepJobId: string }
+  | { kind: 'already_promoted'; existingDeepJobId: string; message: string }
+  | { kind: 'error'; message: string; status: number };
+
+const SUCCESS_NAVIGATION_DELAY_MS = 2500;
+
 export default function Screen3Card({ payload }: Screen3CardProps) {
+  const router = useRouter();
   const [disclosuresOpen, setDisclosuresOpen] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [ctaState, setCtaState] = useState<CtaState>({ kind: 'idle' });
+  const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const promote = usePromoteToDeep();
   const style = verdictStyle(payload.verdict);
   const { Icon } = style;
   const hasPassport = payload.passport_id !== null;
+  const confirmCopy = confirmationCopy(payload.verdict);
 
-  const handleAccept = () => {
-    // Wave 1.B SKELETON — surface that the click was recorded; full
-    // wiring (mutation calling `/api/origination/strategies/{passport_id}/promote-to-deep`)
-    // lands in Wave 1.C / F.1.C.
-    toast.success('Strategy queued for deep validation', {
-      description:
-        hasPassport
-          ? `Passport ${payload.passport_id?.slice(0, 8)}… promoted to deep backtest (wires in F.1.C).`
-          : 'No passport on this verdict yet — full promotion lands in F.1.C.',
+  // Clear any pending navigation timer if the component unmounts before
+  // the timer fires (e.g., user navigated elsewhere via a different
+  // affordance), so we don't push a route on an unmounted component.
+  useEffect(() => {
+    return () => {
+      if (navigationTimerRef.current !== null) {
+        clearTimeout(navigationTimerRef.current);
+        navigationTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  /** Actually fire the mutation — invoked either directly (no
+   *  confirmation needed) or from the AlertDialog's confirm action. */
+  const executePromotion = useCallback(() => {
+    if (!payload.passport_id) {
+      // Guard: should not be reachable because the CTA is disabled
+      // when there is no passport_id, but surface a clear error if
+      // somehow invoked.
+      setCtaState({
+        kind: 'error',
+        status: 0,
+        message: 'No passport id on this result — cannot promote.',
+      });
+      return;
+    }
+    const passportId = payload.passport_id;
+    setCtaState({ kind: 'submitting' });
+    promote.mutate(passportId, {
+      onSuccess: (data) => {
+        setCtaState({ kind: 'success', deepJobId: data.deep_job_id });
+        // Auto-navigate after a brief moment so the customer sees the
+        // success state confirm-then-redirect.
+        navigationTimerRef.current = setTimeout(() => {
+          router.push(`/strategy/${passportId}`);
+        }, SUCCESS_NAVIGATION_DELAY_MS);
+      },
+      onError: (err) => {
+        if (err instanceof AlreadyPromotedError) {
+          setCtaState({
+            kind: 'already_promoted',
+            existingDeepJobId: err.existingDeepJobId,
+            message: err.message,
+          });
+          return;
+        }
+        // 403 / 404 / 422 / 5xx — and network failures wrapped in
+        // HttpError(status=0) by the hook — all land here with a
+        // usable status + message.  The mutation's TError generic is
+        // HttpError so `err` is narrowed to HttpError after the
+        // AlreadyPromotedError check (which extends HttpError).
+        setCtaState({ kind: 'error', status: err.status, message: err.message });
+      },
     });
-  };
+  }, [payload.passport_id, promote, router]);
+
+  /** Top-level click handler — either fires the mutation directly
+   *  (LOOKS_PROMISING) or opens the confirmation dialog (every other
+   *  reachable verdict).  Disabled-state guards earlier-out via the
+   *  Button's `disabled` prop. */
+  const handleAcceptClick = useCallback(() => {
+    if (confirmCopy === null) {
+      executePromotion();
+    } else {
+      setConfirmOpen(true);
+    }
+  }, [confirmCopy, executePromotion]);
+
+  /** Click handler for the AlertDialog's confirm action. */
+  const handleConfirm = useCallback(() => {
+    setConfirmOpen(false);
+    executePromotion();
+  }, [executePromotion]);
+
+  /** Click handler for the "Try again" affordance on error states. */
+  const handleRetry = useCallback(() => {
+    setCtaState({ kind: 'idle' });
+  }, []);
+
+  /** Navigate to the lifecycle view immediately (used by both the
+   *  success state's optional "View now" and the already-promoted
+   *  state's "View Lifecycle" affordance). */
+  const handleViewLifecycle = useCallback(() => {
+    if (!payload.passport_id) return;
+    // Cancel any pending auto-navigation so we don't fire a double push.
+    if (navigationTimerRef.current !== null) {
+      clearTimeout(navigationTimerRef.current);
+      navigationTimerRef.current = null;
+    }
+    router.push(`/strategy/${payload.passport_id}`);
+  }, [payload.passport_id, router]);
 
   const isSmallSample = payload.trade_count < 30;
+
+  // The CTA is disabled when:
+  //   - there is no passport_id (the engine never minted one for this
+  //     verdict — only LOOKS_PROMISING + MIXED_SIGNALS reliably do);
+  //   - the mutation is in flight;
+  //   - the mutation already succeeded (we're about to navigate);
+  //   - the verdict's confirmation cannot earn a passport (no passport
+  //     id means we can't POST to the endpoint).
+  //
+  // The button stays ENABLED on `already_promoted` so the customer can
+  // either retry from a clean state OR (more useful) hit the
+  // "View Lifecycle" link beside it.
+  const ctaDisabled =
+    !hasPassport ||
+    ctaState.kind === 'submitting' ||
+    ctaState.kind === 'success';
+
+  const ctaLabel = (() => {
+    switch (ctaState.kind) {
+      case 'submitting':
+        return 'Promoting…';
+      case 'success':
+        return 'Deep validation queued';
+      case 'already_promoted':
+        return 'Accept & Run Deep Validation';
+      case 'idle':
+      case 'error':
+      default:
+        return 'Accept & Run Deep Validation';
+    }
+  })();
 
   return (
     <Card
       data-testid="payload-screen3"
       data-kind="screen3"
       data-verdict={payload.verdict}
+      data-cta-state={ctaState.kind}
       className={cn('border-l-4', style.borderClassName)}
     >
       <CardHeader>
@@ -345,30 +568,151 @@ export default function Screen3Card({ payload }: Screen3CardProps) {
           )}
         </div>
 
-        {/* Accept-Strategy CTA — SKELETON in Wave 1.B.  Disabled for
-         *  NOT_RECOMMENDED + INCONCLUSIVE verdicts since the strategy
-         *  has not earned a promote path. */}
+        {/* Inline error message — visible only on the error state.
+         *  Surfaces for 403/404/422/network failure (i.e. anything
+         *  that isn't 409 — those land in their own affordance below). */}
+        {ctaState.kind === 'error' && (
+          <div
+            className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs flex items-start justify-between gap-2"
+            data-testid="screen3-cta-error"
+            role="alert"
+          >
+            <div className="flex items-start gap-2">
+              <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+              <span className="leading-relaxed text-destructive">
+                {ctaState.message}
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRetry}
+              data-testid="screen3-cta-retry"
+            >
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {/* Already-promoted affordance — surfaces the 409 path.  The
+         *  customer doesn't need to retry; they need to see the
+         *  existing deep job's lifecycle.  The Tooltip explains why
+         *  the button didn't fire a new submission, and the
+         *  View-Lifecycle action navigates to the F.2 view.  */}
+        {ctaState.kind === 'already_promoted' && (
+          <div
+            className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs flex items-start justify-between gap-2"
+            data-testid="screen3-cta-already-promoted"
+            role="status"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span className="leading-relaxed">
+                This strategy already has a deep validation in progress — view its
+                status instead of resubmitting.
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleViewLifecycle}
+              data-testid="screen3-view-lifecycle"
+            >
+              View Lifecycle
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
+        {/* Accept-Strategy CTA — full state machine wired in F.1.C. */}
         <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[11px] text-muted-foreground" data-testid="screen3-cta-caption">
             {hasPassport
-              ? 'Passport generated — promotion wires in F.1.C.'
+              ? ctaState.kind === 'success'
+                ? `Queued — deep job ${ctaState.deepJobId.slice(0, 8)}…  Redirecting to the lifecycle view.`
+                : 'Promotion sends the strategy through a deeper backtest pipeline.'
               : 'No passport on this verdict.'}
           </span>
-          <Button
-            type="button"
-            onClick={handleAccept}
-            disabled={
-              payload.verdict === 'NOT_RECOMMENDED' ||
-              payload.verdict === 'INCONCLUSIVE'
-            }
-            data-testid="screen3-accept-cta"
-            size="sm"
-          >
-            <Award className="h-4 w-4" />
-            Accept Strategy
-          </Button>
+          {hasPassport ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* Wrapping div keeps the Tooltip trigger usable even when
+                 *  the inner Button is disabled (Radix Tooltip requires a
+                 *  hoverable trigger). */}
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    onClick={handleAcceptClick}
+                    disabled={ctaDisabled}
+                    data-testid="screen3-accept-cta"
+                    size="sm"
+                  >
+                    {ctaState.kind === 'submitting' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : ctaState.kind === 'success' ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <Award className="h-4 w-4" />
+                    )}
+                    {ctaLabel}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {ctaState.kind === 'already_promoted' && (
+                <TooltipContent
+                  data-testid="screen3-already-promoted-tooltip"
+                  side="top"
+                >
+                  This strategy already has a deep validation in progress — view its
+                  status instead.
+                </TooltipContent>
+              )}
+            </Tooltip>
+          ) : (
+            <Button
+              type="button"
+              disabled
+              data-testid="screen3-accept-cta"
+              size="sm"
+            >
+              <Award className="h-4 w-4" />
+              {ctaLabel}
+            </Button>
+          )}
         </div>
       </CardContent>
+
+      {/* Verdict-conditional confirmation gate.  LOOKS_PROMISING never
+       *  surfaces this; every other reachable verdict (MIXED_SIGNALS,
+       *  NOT_RECOMMENDED, INCONCLUSIVE) earns a verdict-specific copy
+       *  that explains what the customer is committing to.  */}
+      {confirmCopy !== null && (
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent data-testid="screen3-confirm-dialog">
+            <AlertDialogHeader>
+              <AlertDialogTitle data-testid="screen3-confirm-title">
+                {confirmCopy.title}
+              </AlertDialogTitle>
+              <AlertDialogDescription data-testid="screen3-confirm-body">
+                {confirmCopy.body}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="screen3-confirm-cancel">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirm}
+                data-testid="screen3-confirm-action"
+              >
+                {confirmCopy.confirmLabel}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </Card>
   );
 }

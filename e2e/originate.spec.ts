@@ -741,6 +741,473 @@ test.describe('/originate — Wave 1.B structured payloads', () => {
   });
 });
 
+test.describe('/originate — F.1.C Accept-Strategy CTA wiring', () => {
+  /**
+   * The CTA on Screen3Card now POSTs to
+   * `/api/origination/strategies/{passport_id}/promote-to-deep`.
+   * These tests stub that endpoint per-scenario and assert the CTA's
+   * state-machine transitions, the verdict-conditional confirmation
+   * dialog, the 409 already-promoted affordance, and the 403/404/422
+   * inline-error path.
+   */
+
+  const PROMISING_PASSPORT_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+  const MIXED_PASSPORT_ID = 'b2c3d4e5-f6a7-8901-bcde-f23456789012';
+  const PROMOTED_DEEP_JOB_ID = 'd1e2f3a4-5678-90ab-cdef-123456789012';
+  const EXISTING_DEEP_JOB_ID = 'e9f0a1b2-cdef-1234-5678-90abcdef0123';
+
+  function promisingScreen3Event(passportId: string = PROMISING_PASSPORT_ID) {
+    return {
+      event: 'turn_complete' as const,
+      session_id: 'sess-cta',
+      output_text: 'Quick validation looks promising.',
+      current_phase: 'deployment_decision',
+      turn_count: 4,
+      phase_advance_offer: null,
+      structured_payload: {
+        verdict: 'looks_promising',
+        strategy_class: 'momentum',
+        window_description: '3 years',
+        ticker: 'AAPL',
+        metrics: {
+          sharpe: 1.42,
+          max_drawdown: -0.08,
+          win_rate: 0.58,
+          total_return: 0.34,
+        },
+        trade_count: 62,
+        disclosures: {
+          biases_not_controlled: ['survivorship'],
+          sample_caveats: ['Window: 3y; ~62 trades'],
+          next_step: '',
+        },
+        passport_id: passportId,
+      },
+    };
+  }
+
+  /**
+   * Helper that constructs a Screen3 turn-complete event with the
+   * supplied verdict + passport_id.  MIXED_SIGNALS / NOT_RECOMMENDED /
+   * INCONCLUSIVE all need a passport_id to be eligible for the CTA —
+   * the dialogue spec doesn't always mint one for these in production,
+   * but for testing the confirmation flow we provide one explicitly.
+   */
+  function borderlineScreen3Event(
+    verdict: 'mixed_signals' | 'not_recommended' | 'inconclusive',
+    passportId: string,
+  ) {
+    return {
+      event: 'turn_complete' as const,
+      session_id: 'sess-cta-borderline',
+      output_text: 'Validation complete.',
+      current_phase: 'deployment_decision',
+      turn_count: 4,
+      phase_advance_offer: null,
+      structured_payload: {
+        verdict,
+        strategy_class: 'breakout',
+        window_description: '2 years',
+        ticker: 'SPY',
+        metrics: {
+          sharpe: 0.45,
+          max_drawdown: -0.18,
+          win_rate: 0.46,
+          total_return: 0.11,
+        },
+        trade_count: 40,
+        disclosures: {
+          biases_not_controlled: [],
+          sample_caveats: [],
+          next_step: '',
+        },
+        passport_id: passportId,
+      },
+    };
+  }
+
+  /** Stub the /promote-to-deep endpoint with a 202 success.  The
+   *  fulfilment is recorded on `window.__promoteCalls` so the test
+   *  can assert the URL contained the correct passport id and the
+   *  body was the expected JSON. */
+  async function stubPromoteEndpoint(
+    page: Page,
+    response: {
+      status: number;
+      body: Record<string, unknown> | string;
+      contentType?: string;
+    },
+  ) {
+    await page.addInitScript(() => {
+      interface PromoteCallWindow extends Window {
+        __promoteCalls?: Array<{ url: string; method: string; body: string | null }>;
+      }
+      (window as PromoteCallWindow).__promoteCalls = [];
+    });
+    await page.route(
+      '**/api/origination/strategies/*/promote-to-deep',
+      async (route, request) => {
+        // Record the call for the test to inspect.
+        await page.evaluate(
+          (rec) => {
+            interface PromoteCallWindow extends Window {
+              __promoteCalls?: Array<{
+                url: string;
+                method: string;
+                body: string | null;
+              }>;
+            }
+            (window as PromoteCallWindow).__promoteCalls?.push(rec);
+          },
+          {
+            url: request.url(),
+            method: request.method(),
+            body: request.postData(),
+          },
+        );
+        await route.fulfill({
+          status: response.status,
+          contentType: response.contentType ?? 'application/json',
+          body:
+            typeof response.body === 'string'
+              ? response.body
+              : JSON.stringify(response.body),
+        });
+      },
+    );
+  }
+
+  async function readPromoteCalls(
+    page: Page,
+  ): Promise<Array<{ url: string; method: string; body: string | null }>> {
+    return page.evaluate(() => {
+      interface PromoteCallWindow extends Window {
+        __promoteCalls?: Array<{
+          url: string;
+          method: string;
+          body: string | null;
+        }>;
+      }
+      return (window as PromoteCallWindow).__promoteCalls ?? [];
+    });
+  }
+
+  test('LOOKS_PROMISING + click Accept fires mutation with correct passport_id, transitions to success', async ({
+    page,
+  }) => {
+    await stubPromoteEndpoint(page, {
+      status: 202,
+      body: {
+        deep_job_id: PROMOTED_DEEP_JOB_ID,
+        submitted_at: '2026-05-12T05:30:00Z',
+      },
+    });
+
+    await drivePage(page, [promisingScreen3Event()]);
+
+    const cta = page.getByTestId('screen3-accept-cta');
+    await expect(cta).toBeEnabled();
+    await expect(cta).toContainText('Accept & Run Deep Validation');
+    await cta.click();
+
+    // No confirmation dialog for LOOKS_PROMISING — direct execute.
+    await expect(page.getByTestId('screen3-confirm-dialog')).toHaveCount(0);
+
+    // Transitions to submitting then success.  Submitting is fleeting in
+    // tests; we go straight to success.
+    await expect(cta).toBeDisabled();
+    await expect(cta).toContainText('Deep validation queued');
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'success',
+    );
+
+    // The success caption surfaces the new deep job id (truncated to 8 chars).
+    await expect(page.getByTestId('screen3-cta-caption')).toContainText(
+      PROMOTED_DEEP_JOB_ID.slice(0, 8),
+    );
+
+    // Confirm the network call landed against the right URL with the
+    // empty JSON body the hook sends.
+    const calls = await readPromoteCalls(page);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toContain(
+      `/api/origination/strategies/${PROMISING_PASSPORT_ID}/promote-to-deep`,
+    );
+    expect(calls[0].body).toBe('{}');
+  });
+
+  test('NOT_RECOMMENDED + click Accept surfaces confirmation dialog, confirm fires mutation', async ({
+    page,
+  }) => {
+    await stubPromoteEndpoint(page, {
+      status: 202,
+      body: {
+        deep_job_id: PROMOTED_DEEP_JOB_ID,
+        submitted_at: '2026-05-12T05:30:00Z',
+      },
+    });
+
+    // NOT_RECOMMENDED needs an explicit passport_id for the CTA to be
+    // enabled — the F.1.C contract is "let the user accept anyway".
+    await drivePage(page, [
+      borderlineScreen3Event('not_recommended', MIXED_PASSPORT_ID),
+    ]);
+
+    const cta = page.getByTestId('screen3-accept-cta');
+    await expect(cta).toBeEnabled();
+    await cta.click();
+
+    // Confirmation dialog appears with the NOT_RECOMMENDED-specific copy.
+    const dialog = page.getByTestId('screen3-confirm-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId('screen3-confirm-title')).toContainText(
+      'Run deep validation on a flagged strategy',
+    );
+    await expect(page.getByTestId('screen3-confirm-body')).toContainText(
+      'significant concerns',
+    );
+
+    // No network call yet — confirmation is gating the mutation.
+    let calls = await readPromoteCalls(page);
+    expect(calls).toHaveLength(0);
+
+    // Confirm — mutation fires.
+    await page.getByTestId('screen3-confirm-action').click();
+    await expect(dialog).toHaveCount(0);
+
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'success',
+    );
+
+    calls = await readPromoteCalls(page);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toContain(
+      `/api/origination/strategies/${MIXED_PASSPORT_ID}/promote-to-deep`,
+    );
+  });
+
+  test('MIXED_SIGNALS + Cancel confirmation does NOT fire the mutation', async ({
+    page,
+  }) => {
+    await stubPromoteEndpoint(page, {
+      status: 202,
+      body: {
+        deep_job_id: PROMOTED_DEEP_JOB_ID,
+        submitted_at: '2026-05-12T05:30:00Z',
+      },
+    });
+
+    await drivePage(page, [
+      borderlineScreen3Event('mixed_signals', MIXED_PASSPORT_ID),
+    ]);
+
+    const cta = page.getByTestId('screen3-accept-cta');
+    await expect(cta).toBeEnabled();
+    await cta.click();
+
+    const dialog = page.getByTestId('screen3-confirm-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId('screen3-confirm-title')).toContainText(
+      'Run deep validation on a mixed result',
+    );
+
+    // Cancel — dialog closes, mutation does NOT fire, button returns to idle.
+    await page.getByTestId('screen3-confirm-cancel').click();
+    await expect(dialog).toHaveCount(0);
+
+    const calls = await readPromoteCalls(page);
+    expect(calls).toHaveLength(0);
+
+    // CTA reverts to idle: enabled, original label, no state-attr change.
+    await expect(cta).toBeEnabled();
+    await expect(cta).toContainText('Accept & Run Deep Validation');
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'idle',
+    );
+  });
+
+  test('INCONCLUSIVE verdict surfaces honest-disclosure confirmation copy', async ({
+    page,
+  }) => {
+    await stubPromoteEndpoint(page, {
+      status: 202,
+      body: {
+        deep_job_id: PROMOTED_DEEP_JOB_ID,
+        submitted_at: '2026-05-12T05:30:00Z',
+      },
+    });
+
+    await drivePage(page, [
+      borderlineScreen3Event('inconclusive', MIXED_PASSPORT_ID),
+    ]);
+
+    const cta = page.getByTestId('screen3-accept-cta');
+    await expect(cta).toBeEnabled();
+    await cta.click();
+
+    const dialog = page.getByTestId('screen3-confirm-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId('screen3-confirm-title')).toContainText(
+      'inconclusive result',
+    );
+    // The honest-not-flattering trust message.
+    await expect(page.getByTestId('screen3-confirm-body')).toContainText(
+      "doesn't have a real edge",
+    );
+  });
+
+  test('409 already promoted surfaces tooltip + View Lifecycle link', async ({
+    page,
+  }) => {
+    // FastAPI wraps the structured detail under `{ detail: { deep_job_id, detail } }`.
+    await stubPromoteEndpoint(page, {
+      status: 409,
+      body: {
+        detail: {
+          deep_job_id: EXISTING_DEEP_JOB_ID,
+          detail: 'Light-backtest passport already promoted to deep.',
+        },
+      },
+    });
+
+    await drivePage(page, [promisingScreen3Event()]);
+
+    const cta = page.getByTestId('screen3-accept-cta');
+    await cta.click();
+
+    // The already-promoted affordance surfaces (state = already_promoted).
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'already_promoted',
+    );
+    const alreadyPromoted = page.getByTestId('screen3-cta-already-promoted');
+    await expect(alreadyPromoted).toBeVisible();
+    await expect(alreadyPromoted).toContainText('already has a deep validation');
+
+    // The View Lifecycle button navigates to /strategy/{passport_id}.
+    await page.getByTestId('screen3-view-lifecycle').click();
+    await expect(page).toHaveURL(new RegExp(`/strategy/${PROMISING_PASSPORT_ID}`));
+  });
+
+  test('403 forbidden surfaces inline error with Try-again affordance', async ({
+    page,
+  }) => {
+    await stubPromoteEndpoint(page, {
+      status: 403,
+      body: { detail: 'Forbidden.' },
+    });
+
+    await drivePage(page, [promisingScreen3Event()]);
+
+    const cta = page.getByTestId('screen3-accept-cta');
+    await cta.click();
+
+    // Inline error surfaces — CTA state attribute becomes 'error'.
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'error',
+    );
+    const errorBox = page.getByTestId('screen3-cta-error');
+    await expect(errorBox).toBeVisible();
+    await expect(errorBox).toContainText('Forbidden');
+
+    // Click Try-again → state returns to idle, button re-enabled.
+    await page.getByTestId('screen3-cta-retry').click();
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'idle',
+    );
+    await expect(errorBox).toHaveCount(0);
+    await expect(cta).toBeEnabled();
+  });
+
+  test('422 missing-spec surfaces inline error with the typed reason', async ({
+    page,
+  }) => {
+    await stubPromoteEndpoint(page, {
+      status: 422,
+      body: {
+        detail:
+          'Originating dialogue session has no latest_trade_idea_spec; deep promotion requires the same TradeIdeaSpec that produced the light passport.',
+      },
+    });
+
+    await drivePage(page, [promisingScreen3Event()]);
+
+    await page.getByTestId('screen3-accept-cta').click();
+
+    const errorBox = page.getByTestId('screen3-cta-error');
+    await expect(errorBox).toBeVisible();
+    await expect(errorBox).toContainText('TradeIdeaSpec');
+  });
+
+  test('network failure surfaces inline error with retry affordance', async ({
+    page,
+  }) => {
+    // page.route can abort with a network error to simulate offline /
+    // DNS / proxy failure.  The hook catches the fetch rejection and
+    // wraps it in HttpError(status=0).
+    await page.route(
+      '**/api/origination/strategies/*/promote-to-deep',
+      async (route) => {
+        await route.abort('connectionfailed');
+      },
+    );
+
+    await drivePage(page, [promisingScreen3Event()]);
+
+    await page.getByTestId('screen3-accept-cta').click();
+
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'error',
+    );
+    const errorBox = page.getByTestId('screen3-cta-error');
+    await expect(errorBox).toBeVisible();
+
+    // Retry affordance is present and clickable.
+    await page.getByTestId('screen3-cta-retry').click();
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'idle',
+    );
+  });
+
+  test('LOOKS_PROMISING success state auto-navigates to /strategy/{passport_id}', async ({
+    page,
+  }) => {
+    await stubPromoteEndpoint(page, {
+      status: 202,
+      body: {
+        deep_job_id: PROMOTED_DEEP_JOB_ID,
+        submitted_at: '2026-05-12T05:30:00Z',
+      },
+    });
+
+    await drivePage(page, [promisingScreen3Event()]);
+
+    await page.getByTestId('screen3-accept-cta').click();
+
+    // Success state confirms first.
+    await expect(page.getByTestId('payload-screen3')).toHaveAttribute(
+      'data-cta-state',
+      'success',
+    );
+
+    // Auto-navigation lands within ~3s (the component waits 2.5s).  The
+    // F.2 page may not exist yet so we tolerate a 404; what we care
+    // about is the URL changed to `/strategy/{passport_id}`.
+    await page.waitForURL(
+      new RegExp(`/strategy/${PROMISING_PASSPORT_ID}`),
+      { timeout: 5_000 },
+    );
+  });
+});
+
 test.describe('/originate — payload discriminator unit tests (run via Playwright)', () => {
   /**
    * Unit-level discriminator coverage — the discriminator is a pure
