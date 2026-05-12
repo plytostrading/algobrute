@@ -84,11 +84,32 @@ export interface DialogueMessage {
   structured_payloads?: TaggedStructuredPayload[];
 }
 
-/** First-message envelope on the WebSocket per backend handshake schema. */
+/** First-message envelope on the WebSocket per backend handshake schema.
+ *
+ * Wave Q.2.B foundation — the engine's ``DialogueStreamHandshake``
+ * Pydantic class (src/algobrute/api/routers/dialogue_stream.py) accepts
+ * the optional fields below.  Each one unlocks a customer-facing
+ * surface that subsequent Wave Q.2.B sub-agents own:
+ *   - ``confirm_advance_to`` — B2 phase-advance confirmation flow
+ *     (agent-proposes / user-confirms phase progression).
+ *   - ``investor_type`` — B3 InvestorType override UI (the customer
+ *     can confirm or correct the engine's inferred archetype).
+ *   - ``artifact_content`` + ``artifact_source_type`` — B4 artifact
+ *     attachment surface (PineScript paste, paper PDF upload, chart
+ *     screenshot, Composer JSON).
+ *
+ * All fields are optional with omitted-defaults so existing handshake
+ * callers keep working unchanged; B2/B3/B4 sub-agents add the UI
+ * surfaces that populate them as the customer interacts.
+ */
 interface DialogueHandshake {
   token: string;
   user_input: string;
   session_id?: string;
+  confirm_advance_to?: string;
+  investor_type?: string;
+  artifact_content?: string;
+  artifact_source_type?: string;
 }
 
 /** Discriminated union over the streaming event types the backend emits. */
