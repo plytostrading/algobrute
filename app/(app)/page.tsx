@@ -18,11 +18,13 @@ import PortfolioImpact from '@/components/command-center/PortfolioImpact';
 import RiskSnapshotCard from '@/components/command-center/RiskSnapshotCard';
 import CircuitBreakerMeters from '@/components/command-center/CircuitBreakerMeters';
 import FearGreedCard from '@/components/command-center/FearGreedCard';
+import EmptyState from '@/components/command-center/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleetWeather, useFleetWeatherHistory } from '@/hooks/useFleetWeather';
 import { useFleetNarrative } from '@/hooks/useFleetNarrative';
 import { useFleetRecommendations } from '@/hooks/useFleetRecommendations';
 import { useBots } from '@/hooks/useBots';
+import { useFleetState } from '@/hooks/useFleetState';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useFleetBenchmark } from '@/hooks/useFleetBenchmark';
 import { weatherScoreToGrade } from '@/lib/colors';
@@ -136,6 +138,7 @@ export default function CommandCenter() {
   const { data: narrative } = useFleetNarrative();
   const { data: recommendations } = useFleetRecommendations();
   const { data: bots } = useBots();
+  const { data: fleetState, isLoading: fleetStateLoading } = useFleetState();
   const { data: profile } = useUserProfile();
   const { data: benchmarkData } = useFleetBenchmark();
 
@@ -211,8 +214,10 @@ export default function CommandCenter() {
     [weather, narrative, recommendations, drawdownTolerance],
   );
 
-  // Loading skeleton — matches HeroZone + narrative card + equity chart shape
-  if (weatherLoading) {
+  // Loading skeleton — matches HeroZone + narrative card + equity chart shape.
+  // Wait for BOTH weather AND fleet-state so the empty-state branch below
+  // doesn't flicker into view while bot data is still in flight.
+  if (weatherLoading || fleetStateLoading) {
     return (
       <div className="flex flex-col gap-6">
         <Skeleton className="h-36 rounded-xl" />
@@ -220,6 +225,14 @@ export default function CommandCenter() {
         <Skeleton className="h-80 rounded-xl" />
       </div>
     );
+  }
+
+  // F.3 — new-user onboarding: when the authenticated user has zero bots,
+  // route them straight to /originate or /workbench rather than rendering an
+  // empty Command Center. Gated on a successful fleet-state fetch so that a
+  // transient API failure doesn't accidentally surface the empty-state.
+  if (fleetState && fleetState.bot_snapshots.length === 0) {
+    return <EmptyState />;
   }
 
   // Error / backend offline state
