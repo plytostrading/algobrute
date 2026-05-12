@@ -581,6 +581,58 @@ export interface ValidationSimulationRunResult {
   total_return_pct: number;
 }
 
+export interface TradeGlobalContextAudit {
+  ensemble_label: string;
+  market_regime: string;
+  stress_level: string;
+  transition_phase: string;
+  substate?: string | null;
+  confidence: number;
+  source: string;
+  source_version: string;
+  legacy_regime_projection?: string | null;
+}
+
+export interface TradeSectorContextAudit {
+  sector_key: string;
+  sector_state: string;
+  readiness_score: number;
+  alignment_score: number;
+  ood_flag?: boolean;
+}
+
+export interface TradeLocalContextAudit {
+  ticker: string;
+  local_state: string;
+  local_change_probability: number;
+  tradability_score: number;
+  readiness_score: number;
+  contradiction_score: number;
+  market_alignment_score: number;
+  sector_alignment_score?: number | null;
+  uncertainty_flag?: boolean;
+  event_risk_flag?: boolean;
+  liquidity_risk_flag?: boolean;
+  ood_flag?: boolean;
+}
+
+export interface TradeGovernanceContextAudit {
+  readiness_score: number;
+  contradiction_score: number;
+  requires_review?: boolean;
+  support_mode: string;
+  diagnostic_flags?: string[];
+}
+
+export interface TradeHierarchicalContextAudit {
+  asof_date?: string | null;
+  mapping_policy_version?: string | null;
+  global_context: TradeGlobalContextAudit;
+  local_context: TradeLocalContextAudit;
+  sector_context?: TradeSectorContextAudit | null;
+  governance: TradeGovernanceContextAudit;
+}
+
 export interface ValidationSimulationTradeSummary {
   trade_id: string;
   ticker: string;
@@ -591,6 +643,11 @@ export interface ValidationSimulationTradeSummary {
   exit_price: number | null;
   quantity: number;
   entry_regime: string;
+  entry_market_regime?: string | null;
+  entry_stress_level?: string | null;
+  entry_local_state?: string | null;
+  entry_hierarchical_regime_label?: string | null;
+  entry_hierarchical_context?: TradeHierarchicalContextAudit | null;
   exit_regime: string | null;
   realized_pnl: number | null;
   realized_pnl_pct: number | null;
@@ -624,6 +681,11 @@ export interface ValidationSimulationDaySummary {
   sequence_no: number;
   event_time: string | null;
   regime: string | null;
+  market_regime?: string | null;
+  stress_level?: string | null;
+  transition_phase?: string | null;
+  local_state?: string | null;
+  hierarchical_regime_label?: string | null;
   close_price: number | null;
   cash: number | null;
   portfolio_value: number | null;
@@ -711,11 +773,26 @@ export interface TradeRecord {
   exit_reason: string | null;
   backtest_path_id: number | null;
   signal_strength: number | null;
+  entry_hierarchical_context?: TradeHierarchicalContextAudit | null;
 }
 
 // ---------------------------------------------------------------------------
 // Backtest (job lifecycle)
 // ---------------------------------------------------------------------------
+
+/** POST /api/backtest/run request body */
+export interface TradeIdeaSpec {
+  title: string;
+  narrative: string;
+  side_bias: 'long' | 'short' | 'both';
+  holding_horizon: 'intraday' | 'swing' | 'position';
+  preferred_regimes?: string[];
+  forbidden_regimes?: string[];
+  preferred_signal_families?: string[];
+  forbidden_signal_families?: string[];
+  setup_constraints?: Record<string, unknown>;
+  risk_preferences?: Record<string, unknown>;
+}
 
 /** POST /api/backtest/run request body */
 export interface BacktestRequest {
@@ -725,8 +802,9 @@ export interface BacktestRequest {
   end_date: string;
   initial_capital: number;
   /** Compute-budget profile. Defaults to 'standard' when omitted. */
-  profile?: 'standard' | 'thorough';
+  profile?: 'fast' | 'standard' | 'thorough';
   validation_simulation_days?: number;
+  trade_idea_spec?: TradeIdeaSpec;
 }
 
 /** POST /api/backtest/run response */
@@ -744,6 +822,7 @@ export interface JobStatus {
   error_message: string | null;
   validation_window: ValidationSimulationWindow | null;
   validation_ready: boolean;
+  chart_data_available?: boolean;
 }
 
 /** GET /api/backtest/{id} — completed result (minimal) */
@@ -759,6 +838,7 @@ export interface BacktestResult {
   status: string;
   validation_window: ValidationSimulationWindow | null;
   validation_ready: boolean;
+  chart_data_available?: boolean;
   compute_wall_seconds?: number | null;
   compute_cpu_seconds?: number | null;
 }
@@ -1020,7 +1100,32 @@ export interface BacktestExportReport {
 // Regime labels — walk-forward inference series
 // ---------------------------------------------------------------------------
 
-/** Slim regime signal shape returned by GET /api/backtest/{id}/regime-labels. */
+export interface BacktestContextGlobalRegime {
+  market_regime: string;
+  stress_level: string;
+  transition_phase: string;
+  confidence?: number;
+  source?: string;
+  source_version?: string;
+}
+
+export interface BacktestContextLocalRegime {
+  ticker: string;
+  local_state: string;
+  tradability_score?: number;
+  readiness_score?: number;
+  contradiction_score?: number;
+  market_alignment_score?: number;
+}
+
+export interface BacktestContextPacket {
+  asof_date?: string | null;
+  mapping_policy_version?: string | null;
+  global_regime: BacktestContextGlobalRegime;
+  local_regime: BacktestContextLocalRegime;
+}
+
+/** Walk-forward regime signal returned by GET /api/backtest/{id}/regime-labels. */
 export interface RegimeSignalSlim {
   /** 0=LOW_VOL, 1=NORMAL, 2=ELEVATED_VOL, 3=CRISIS */
   ensemble_label: Regime;
@@ -1031,6 +1136,8 @@ export interface RegimeSignalSlim {
    * JSON keys are stringified integers: "0", "1", "2", "3".
    */
   regime_probabilities: Record<string, number>;
+  /** Optional hierarchical packet available on newer backtests. */
+  backtest_context?: BacktestContextPacket | null;
 }
 
 /** GET /api/backtest/{id}/regime-labels — one walk-forward inference snapshot. */
@@ -1270,6 +1377,7 @@ export interface BacktestJobSummary {
   total_return_pct: number | null;
   validation_window: ValidationSimulationWindow | null;
   validation_ready: boolean;
+  chart_data_available?: boolean;
   compute_wall_seconds?: number | null;
   compute_cpu_seconds?: number | null;
   /** Current pipeline phase while the job is running; null when pending or complete. */
@@ -1366,4 +1474,119 @@ export interface PassportPromotionResponse {
   created_at: string;
   /** Full StrategyPassport serialized to JSON */
   passport_json: string;
+}
+
+// ---------------------------------------------------------------------------
+// Origination Strategy — light-backtest disclosure shape (mirrors the engine
+// BiasDisclosure dict persisted on LightBacktestPassport rows).  The shape
+// is intentionally permissive (Record<string, unknown> for extras) because
+// older passports may carry partial dictionaries; the contracted keys are
+// pulled out explicitly for type-safe rendering.
+// ---------------------------------------------------------------------------
+
+export interface LightBacktestDisclosures {
+  biases_not_controlled?: string[];
+  sample_caveats?: string[];
+  next_step?: string;
+  /** Forward-compatible — older passports may carry additional fields. */
+  [key: string]: unknown;
+}
+
+/**
+ * GET /api/origination/strategies/{light_passport_id}/lifecycle
+ *
+ * Phase Q Wave 1.B E.3 — single-strategy unified lifecycle projection.
+ * Mirrors :class:`algobrute.contracts.origination_view.StrategyLifecycleView`
+ * exactly.  Each stage's fields populate monotonically:
+ *
+ *   1. Dialogue + light backtest — always populated.
+ *   2. Deep promotion — `deep_promotion_job_id` non-null only after the
+ *      customer clicks "Run Deep Validation".
+ *   3. Deep passport metrics — populated only when the deep job completes.
+ *      `deep_passport_blocking_reasons` distinguishes three states via its
+ *      three-state encoding (`null` / `[]` / `[reason, ...]`).
+ *   4. Bot deployment — `bot_id` non-null only after the customer deploys.
+ *   5. Live operation — `live_closed_trade_count` non-null only when the
+ *      bot exists; `0` means "deployed with no closed trades yet".
+ */
+export interface StrategyLifecycleView {
+  // ── Identity (always populated) ───────────────────────────────────
+  light_passport_id: string;
+  session_id: string;
+  strategy_class: string;
+  ticker: string;
+  /** ISO datetime — passport creation timestamp. */
+  originated_at: string;
+
+  // ── Dialogue stage (always populated) ─────────────────────────────
+  dialogue_turn_count: number;
+  /** DialoguePhase value strings in chronological order of first entry. */
+  dialogue_completed_phases: string[];
+
+  // ── Light backtest stage (always populated) ───────────────────────
+  light_verdict: string;
+  /** Headline metrics keyed by the Wave 5.5-canonical naked keys. */
+  light_metrics: Record<string, number | null>;
+  light_trade_count: number;
+  light_disclosures: LightBacktestDisclosures;
+
+  // ── Deep backtest stage (None when not yet promoted) ──────────────
+  deep_promotion_job_id: string | null;
+  /** ISO datetime — wall-clock UTC when deep promotion was initiated. */
+  deep_promoted_at: string | null;
+  /** "pending" | "running" | "complete" | "failed" — null when no deep job. */
+  deep_job_status: string | null;
+  /** Free-form pipeline phase string from PHASE_PROGRESS. */
+  deep_job_progress_phase: string | null;
+  deep_passport_id: string | null;
+  deep_passport_deployment_approved: boolean | null;
+  deep_passport_sharpe: number | null;
+  deep_passport_max_drawdown: number | null;
+  deep_passport_total_return: number | null;
+  /**
+   * Three-state encoding:
+   *   null      — no deep passport yet.
+   *   []        — deep passport approved (conceptually empty list).
+   *   [reason]  — deep passport rejected with blocking reasons.
+   */
+  deep_passport_blocking_reasons: string[] | null;
+
+  // ── Bot deployment stage (None when not yet deployed) ─────────────
+  bot_id: string | null;
+  /** Mirror of BotState enum. */
+  bot_state: string | null;
+  /** "paper" | "live". */
+  bot_trading_mode: string | null;
+  bot_capital_allocation_pct: number | null;
+  bot_initial_capital: number | null;
+  /** ISO datetime — BotModel.created_at. */
+  bot_deployed_at: string | null;
+
+  // ── Live operation stage (None when no bot or no trades) ──────────
+  live_total_pnl_usd: number | null;
+  live_total_pnl_pct: number | null;
+  /** 0 (not null) when bot exists with zero closed trades. */
+  live_closed_trade_count: number | null;
+  live_open_position_count: number | null;
+  /** ISO datetime — most-recent exit_date / entry_date. */
+  live_last_updated_at: string | null;
+}
+
+/** POST /api/origination/strategies/{light_passport_id}/promote-to-deep */
+export interface PromoteToDeepRequest {
+  /** Optional override for the deep-backtest window length. */
+  lookback_days?: number;
+}
+
+/** POST /api/origination/strategies/{light_passport_id}/promote-to-deep — 202 response */
+export interface PromoteToDeepResponse {
+  deep_job_id: string;
+  /** ISO datetime. */
+  submitted_at: string;
+}
+
+/** 409 Conflict response body when the passport is already promoted. */
+export interface AlreadyPromotedResponse {
+  deep_job_id: string;
+  detail: string;
 }

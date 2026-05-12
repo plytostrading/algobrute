@@ -56,6 +56,24 @@ export const queryKeys = {
     detail: (strategyId: string | null | undefined) =>
       ['strategies', strategyId] as const,
   },
+  origination: {
+    all: ['origination'] as const,
+    /**
+     * "My originated strategies" listing — backed by
+     * GET /api/origination/strategies/me.  Invalidated by
+     * usePromoteToDeep on a successful 202 so any list view picks up
+     * the new deep_job_id.
+     */
+    strategiesList: ['origination', 'strategies', 'me'] as const,
+    /**
+     * Per-strategy lifecycle envelope — backed by
+     * GET /api/origination/strategies/{passport_id}/lifecycle.
+     * Invalidated by usePromoteToDeep and useDeployBot so the
+     * per-strategy timeline re-fetches after either mutation lands.
+     */
+    lifecycle: (passportId: string | null | undefined) =>
+      ['origination', 'strategies', passportId, 'lifecycle'] as const,
+  },
   backtest: {
     all: ['backtest'] as const,
     list: ['backtest', 'list'] as const,
