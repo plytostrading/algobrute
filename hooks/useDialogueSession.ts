@@ -21,8 +21,15 @@
  *     (``failure_mode_materialized`` triggers + emerging metrics) feed the
  *     existing ``lightBacktest`` setter.
  *
- * F.1.C will add: Accept-Strategy mutation wiring, light-backtest fingerprint
- * detection, and phase-advance-offer surfacing.
+ * Wave Q.2.B (B2) — phase-advance-offer surfacing.  ``turn_complete`` events
+ * carry a ``phase_advance_offer`` whose shape mirrors the engine
+ * :class:`algobrute.origination.dialogue.state.PhaseAdvanceOffer` 1:1.  The
+ * hook exposes the latest offer + a ``confirmAdvance(target_phase)`` action
+ * that buffers the customer's confirmation into the next handshake's
+ * ``confirm_advance_to`` field, plus a ``dismissAdvanceOffer()`` action for
+ * the "Not yet" path.  Before this work landed, the engine emitted the
+ * proposal payload but no UI affordance let the customer act on it, so
+ * phase progression silently stalled — see Bug B2 in the Phase Q.2 audit.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -32,8 +39,10 @@ import {
 } from '@/components/originate/payloads/discriminate';
 import type {
   DialoguePhase,
+  InvestorType,
   LightBacktestStatus,
   LightBacktestVerdict,
+  PhaseAdvanceOffer,
   RawStructuredPayload,
   TaggedStructuredPayload,
 } from '@/types/originate';
@@ -44,6 +53,7 @@ export type {
   DialoguePhase,
   LightBacktestStatus,
   LightBacktestVerdict,
+  PhaseAdvanceOffer,
 } from '@/types/originate';
 
 // ---------------------------------------------------------------------------
@@ -82,7 +92,61 @@ export interface DialogueMessage {
   createdAt: number;
   /** Optional structured payloads attached to this message — rendered as cards below the text. */
   structured_payloads?: TaggedStructuredPayload[];
+  /** Wave Q.2.B (B4) — when the user attached an artifact alongside this
+   *  message, the metadata is preserved so the message bubble can render
+   *  a "Attached: filename (size)" badge after send.  Populated on user
+   *  rows only (the engine never echoes the artifact back). */
+  attachment_meta?: DialogueAttachmentMeta;
 }
+
+/** Wave Q.2.B (B4) — user-attached artifact metadata.
+ *
+ * Mirrors the subset of the engine's ``DialogueStreamHandshake``
+ * ``artifact_content`` + ``artifact_source_type`` that's safe to keep
+ * in client memory after send.  The full ``content`` field is held
+ * transiently while preparing the handshake; only ``label`` + ``size`` +
+ * ``sourceType`` survive into the rendered message badge.
+ *
+ * The five ``sourceType`` values mirror the engine's
+ * :class:`algobrute.origination.tool_sanitization.ArtifactSourceType`
+ * enum:
+ *   - ``pinescript`` — TradingView Pine code paste.
+ *   - ``pdf`` — research paper / book PDF upload (base64-encoded).
+ *   - ``chart_annotation`` — chart screenshot (base64-encoded image).
+ *   - ``video_transcript`` — reference URL (research / video link).
+ *   - ``generic`` — Composer JSON or other free-form artifacts.
+ */
+export interface DialogueAttachmentMeta {
+  /** Human-readable label — filename for file uploads, "PineScript paste"
+   *  / "Reference URL" for text-input attachments. */
+  label: string;
+  /** Byte/character size for the badge subtitle. */
+  size: number;
+  /** Engine-facing source type, fed verbatim as ``artifact_source_type``. */
+  sourceType: string;
+}
+
+/** Wave Q.2.B (B4) — payload of a one-shot attachment passed alongside a
+ *  user input.  When ``content`` exceeds 200_000 characters, the hook
+ *  rejects the send with an error (mirrors the engine's
+ *  ``max_length=200_000`` Pydantic constraint).  The optional ``label``
+ *  is rendered in the user-message badge after send. */
+export interface DialogueAttachmentPayload {
+  /** Sanitisation-bound text (may be base64 for binary artifacts). */
+  content: string;
+  /** Engine-facing ``artifact_source_type``; one of the
+   *  ``ArtifactSourceType`` values (``pinescript`` / ``pdf`` /
+   *  ``chart_annotation`` / ``video_transcript`` / ``generic``). */
+  sourceType: string;
+  /** Optional human-readable label for the post-send badge. */
+  label?: string;
+}
+
+/** Wave Q.2.B (B4) — maximum artifact size in characters.  Mirrors the
+ *  engine's ``DialogueStreamHandshake.artifact_content`` Pydantic
+ *  ``max_length`` constraint (src/algobrute/api/routers/dialogue_stream.py:168).
+ */
+export const ARTIFACT_CONTENT_MAX_CHARS = 200_000;
 
 /** First-message envelope on the WebSocket per backend handshake schema.
  *
@@ -130,7 +194,10 @@ type DialogueEvent =
       current_phase: string;
       turn_count: number;
       structured_payload: RawStructuredPayload | null;
-      phase_advance_offer: Record<string, unknown> | null;
+      // Wave Q.2.B (B2) — tightened from ``Record<string, unknown> | null``
+      // to the mirrored engine Pydantic shape so the hook + consuming
+      // UI can rely on the field names rather than untyped key access.
+      phase_advance_offer: PhaseAdvanceOffer | null;
     }
   | { event: 'error'; detail: string };
 
@@ -142,8 +209,54 @@ export interface UseDialogueSessionReturn {
   connectionState: ConnectionState;
   /** Last error message surfaced from the backend (close codes, etc.). */
   errorDetail: string | null;
-  /** Send a user message. Opens the socket on first send if needed. */
-  sendUserInput: (input: string) => void;
+  /** Send a user message. Opens the socket on first send if needed.
+   *
+   *  Wave Q.2.B (B4) — accepts an optional one-shot ``attachment`` that
+   *  is forwarded as ``artifact_content`` + ``artifact_source_type``
+   *  on the next handshake.  Attachments are NOT remembered across
+   *  sends — every subsequent ``sendUserInput`` call carries no
+   *  artifact unless the caller passes a fresh attachment.  A content
+   *  string longer than ``ARTIFACT_CONTENT_MAX_CHARS`` rejects the
+   *  send and surfaces an error on the session.
+   */
+  sendUserInput: (input: string, attachment?: DialogueAttachmentPayload) => void;
+  /** Wave Q.2.B (B2) — the most recent phase-advance offer surfaced by
+   *  the engine on a ``turn_complete`` event.  ``null`` when no offer is
+   *  in flight (either the engine never proposed one this turn, or the
+   *  customer has dismissed / confirmed the previous one).  Consumed by
+   *  the ``PhaseAdvanceCard`` UI affordance. */
+  phaseAdvanceOffer: PhaseAdvanceOffer | null;
+  /** Wave Q.2.B (B2) — confirm an advance to the supplied phase.  The
+   *  target_phase value is populated as ``confirm_advance_to`` on the
+   *  NEXT handshake the hook sends (i.e. on the customer's next user
+   *  input).  The offer is cleared from local state immediately so the
+   *  card disappears as soon as the confirm button is pressed.
+   *
+   *  ``target_phase`` is the lowercase ``DialoguePhase.value`` wire
+   *  string (e.g. ``"validation"``) as carried by
+   *  ``phaseAdvanceOffer.proposed_phase``. */
+  confirmAdvance: (target_phase: string) => void;
+  /** Wave Q.2.B (B2) — dismiss the in-flight offer without confirming.
+   *  The card disappears until the next ``turn_complete`` carries a
+   *  fresh offer.  Mirrors the "Not yet" path of the agent-proposes /
+   *  user-confirms flow. */
+  dismissAdvanceOffer: () => void;
+  /** Wave Q.2.B (B3) — pending one-shot ``investor_type`` override.  When
+   *  non-null, the value is buffered for attachment to the NEXT
+   *  handshake's ``investor_type`` field.  ``null`` once the override
+   *  has been drained into the handshake (one-shot — the engine
+   *  persists the corrected InvestorType into ``DialogueState`` so
+   *  subsequent turns don't need to re-send it). */
+  investorTypeOverride: InvestorType | null;
+  /** Wave Q.2.B (B3) — record an investor-type override.  Buffered into
+   *  ``pendingInvestorTypeOverrideRef`` and surfaced on
+   *  ``investorTypeOverride`` so the UI can render a "We'll re-classify
+   *  on your next message as ${label}" confirmation.  The buffered
+   *  value lands on the NEXT handshake's ``investor_type`` field
+   *  (drained inside ``ws.onopen``) and is cleared after a single use
+   *  — subsequent ``sendUserInput`` calls carry no ``investor_type``
+   *  unless the customer overrides again. */
+  setInvestorTypeOverride: (investor_type: InvestorType) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,11 +336,41 @@ export function useDialogueSession(): UseDialogueSessionReturn {
   const [messages, setMessages] = useState<DialogueMessage[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  /** Wave Q.2.B (B2) — the latest phase-advance offer the engine has
+   *  surfaced on a ``turn_complete`` event.  ``null`` when no offer is
+   *  currently in flight. */
+  const [phaseAdvanceOffer, setPhaseAdvanceOffer] =
+    useState<PhaseAdvanceOffer | null>(null);
+  /** Wave Q.2.B (B3) — the pending investor-type override surfaced to
+   *  the UI for confirmation ("We'll re-classify on your next message
+   *  as ${label}").  Mirrored by ``pendingInvestorTypeOverrideRef``;
+   *  the state is what UI consumers read, the ref is what
+   *  ``ws.onopen`` drains. */
+  const [investorTypeOverride, setInvestorTypeOverrideState] =
+    useState<InvestorType | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
   const pendingInputRef = useRef<string | null>(null);
+  /** Wave Q.2.B (B4) — one-shot attachment buffered by ``sendUserInput``
+   *  for the next handshake send.  Cleared after a single use so
+   *  subsequent ``sendUserInput`` calls without an attachment do not
+   *  re-send the previous artifact. */
+  const pendingAttachmentRef = useRef<DialogueAttachmentPayload | null>(null);
+  /** Wave Q.2.B (B2) — one-shot ``confirm_advance_to`` populated by the
+   *  user clicking [Confirm advance] in ``PhaseAdvanceCard``.  Drained
+   *  into the next handshake on ``ws.onopen`` and cleared so it doesn't
+   *  re-fire on subsequent turns. */
+  const pendingConfirmAdvanceToRef = useRef<string | null>(null);
+  /** Wave Q.2.B (B3) — one-shot ``investor_type`` override populated by
+   *  ``setInvestorTypeOverride`` when the customer corrects the engine's
+   *  inferred archetype on a ``Screen1Payload``.  Drained into the next
+   *  handshake on ``ws.onopen`` and cleared so a transient reconnect
+   *  doesn't re-fire the override on a subsequent turn (the engine
+   *  persists the corrected ``InvestorType`` into ``DialogueState``
+   *  so the override is intentionally one-shot per click). */
+  const pendingInvestorTypeOverrideRef = useRef<InvestorType | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   /** Tracks the id of the most-recent agent message so per-agent
    *  payload events can attach to it without creating a phantom row. */
@@ -437,6 +580,21 @@ export function useDialogueSession(): UseDialogueSessionReturn {
             attachPayloadToLastAgent(tagged);
           }
           if (tagged) foldPayloadIntoBacktest(tagged);
+          // Wave Q.2.B (B2) — surface the phase-advance offer when the
+          // engine emits one; clear a stale offer when no offer is
+          // surfaced this turn (e.g. the user already confirmed and
+          // the engine acknowledged by advancing).  Setting to the new
+          // offer or to null is a single assignment so the
+          // PhaseAdvanceCard re-renders cleanly between turns.
+          setPhaseAdvanceOffer((prev) => {
+            if (evt.phase_advance_offer) {
+              return evt.phase_advance_offer;
+            }
+            if (prev !== null) {
+              return null;
+            }
+            return prev;
+          });
           break;
         }
         case 'error':
@@ -478,6 +636,44 @@ export function useDialogueSession(): UseDialogueSessionReturn {
         const currentSessionId = sessionIdRef.current;
         if (currentSessionId) {
           handshake.session_id = currentSessionId;
+        }
+        // Wave Q.2.B (B2) — drain the one-shot pending confirm-advance
+        // into the handshake's ``confirm_advance_to``.  Cleared after
+        // draining so a transient reconnect doesn't double-confirm an
+        // already-accepted offer (the reconnect path replays
+        // ``pendingInputRef`` text but B2 confirms are intentionally
+        // one-shot per send).
+        const pendingConfirm = pendingConfirmAdvanceToRef.current;
+        if (pendingConfirm) {
+          handshake.confirm_advance_to = pendingConfirm;
+          pendingConfirmAdvanceToRef.current = null;
+        }
+        // Wave Q.2.B (B4) — drain the one-shot pending attachment into
+        // the handshake.  After draining the ref is cleared so an
+        // auto-reconnect after a transient close does not re-attach an
+        // already-consumed artifact (the reconnect path only replays
+        // ``pendingInputRef`` text; artifact-bearing turns are
+        // intentionally one-shot per send).
+        const pendingAttachment = pendingAttachmentRef.current;
+        if (pendingAttachment) {
+          handshake.artifact_content = pendingAttachment.content;
+          handshake.artifact_source_type = pendingAttachment.sourceType;
+          pendingAttachmentRef.current = null;
+        }
+        // Wave Q.2.B (B3) — drain the one-shot pending InvestorType
+        // override into the handshake's ``investor_type``.  Cleared
+        // after draining + the public ``investorTypeOverride`` state
+        // resets to null so the UI confirmation strip disappears once
+        // the override has been sent.  The engine persists the
+        // corrected InvestorType into DialogueState, so subsequent
+        // turns don't need to re-send it (one-shot per explicit
+        // customer action — not on every handshake).
+        const pendingInvestorTypeOverride =
+          pendingInvestorTypeOverrideRef.current;
+        if (pendingInvestorTypeOverride) {
+          handshake.investor_type = pendingInvestorTypeOverride;
+          pendingInvestorTypeOverrideRef.current = null;
+          setInvestorTypeOverrideState(null);
         }
         try {
           ws.send(JSON.stringify(handshake));
@@ -544,20 +740,101 @@ export function useDialogueSession(): UseDialogueSessionReturn {
   );
 
   const sendUserInput = useCallback(
-    (input: string) => {
+    (input: string, attachment?: DialogueAttachmentPayload) => {
       const trimmed = input.trim();
       if (!trimmed) return;
 
-      appendMessage({ role: 'user', text: trimmed });
+      // Wave Q.2.B (B4) — validate the attachment size before doing any
+      // state work.  A rejected send surfaces an error and skips the
+      // socket entirely; the user message is not appended so the
+      // transcript stays clean of half-sent turns.
+      if (attachment) {
+        if (attachment.content.length > ARTIFACT_CONTENT_MAX_CHARS) {
+          setErrorDetail(
+            `Attachment too large — ${attachment.content.length.toLocaleString()} ` +
+              `characters exceeds the ${ARTIFACT_CONTENT_MAX_CHARS.toLocaleString()} ` +
+              `character limit.  Trim or split the artifact and try again.`,
+          );
+          appendMessage({
+            role: 'system',
+            text:
+              `Attachment rejected — ${attachment.content.length.toLocaleString()} ` +
+              `characters exceeds the ${ARTIFACT_CONTENT_MAX_CHARS.toLocaleString()} ` +
+              `character limit.`,
+          });
+          return;
+        }
+      }
+
+      // Wave Q.2.B (B4) — derive the post-send badge meta from the
+      // attachment payload.  The full ``content`` itself is held only
+      // long enough to ride the handshake; the message bubble keeps a
+      // lightweight ``{label, size, sourceType}`` triple for the badge.
+      const attachmentMeta: DialogueAttachmentMeta | undefined = attachment
+        ? {
+            label: attachment.label ?? 'Attached artifact',
+            size: attachment.content.length,
+            sourceType: attachment.sourceType,
+          }
+        : undefined;
+
+      appendMessage({
+        role: 'user',
+        text: trimmed,
+        attachment_meta: attachmentMeta,
+      });
 
       // Phase L.1 design: one socket = one turn. Always open a fresh socket
       // per user input, sending the handshake (which carries user_input) on
       // open. session_id is preserved across turns via sessionIdRef so the
       // backend can resume the conversation.
+      //
+      // Wave Q.2.B (B4) — when an attachment is supplied, stash it in
+      // the one-shot ref so the next ``onopen`` drains it into the
+      // handshake.  The ref is cleared inside ``onopen`` so subsequent
+      // ``sendUserInput`` calls without a fresh attachment will not
+      // re-send the previous artifact.
       pendingInputRef.current = trimmed;
+      pendingAttachmentRef.current = attachment ?? null;
       openSocket(trimmed);
     },
     [appendMessage, openSocket],
+  );
+
+  /** Wave Q.2.B (B2) — confirm the in-flight phase-advance offer.  The
+   *  target_phase string is buffered into ``pendingConfirmAdvanceToRef``
+   *  so it lands on the NEXT handshake (when the user types their next
+   *  message + ``sendUserInput`` opens a fresh socket).  The local
+   *  ``phaseAdvanceOffer`` state is cleared immediately so the card
+   *  disappears the moment the customer clicks Confirm. */
+  const confirmAdvance = useCallback((target_phase: string) => {
+    if (!target_phase) return;
+    pendingConfirmAdvanceToRef.current = target_phase;
+    setPhaseAdvanceOffer(null);
+  }, []);
+
+  /** Wave Q.2.B (B2) — dismiss the in-flight phase-advance offer without
+   *  confirming.  The next offer to arrive on a ``turn_complete`` will
+   *  re-surface the card; the engine continues to drive the offer
+   *  lifecycle independently of the dismiss action. */
+  const dismissAdvanceOffer = useCallback(() => {
+    setPhaseAdvanceOffer(null);
+  }, []);
+
+  /** Wave Q.2.B (B3) — record an InvestorType override.  Buffers the
+   *  selected type into ``pendingInvestorTypeOverrideRef`` so the next
+   *  ``sendUserInput`` call's handshake carries ``investor_type`` and
+   *  mirrors it on ``investorTypeOverride`` so the Screen1Card UI can
+   *  render its "We'll re-classify on your next message as ${label}"
+   *  confirmation strip.  Cleared from both ref + state after the
+   *  override drains into the handshake (one-shot semantics — engine
+   *  persists into DialogueState; subsequent turns don't re-send). */
+  const setInvestorTypeOverride = useCallback(
+    (investor_type: InvestorType) => {
+      pendingInvestorTypeOverrideRef.current = investor_type;
+      setInvestorTypeOverrideState(investor_type);
+    },
+    [],
   );
 
   // Cleanup on unmount.
@@ -583,5 +860,12 @@ export function useDialogueSession(): UseDialogueSessionReturn {
     connectionState,
     errorDetail,
     sendUserInput,
+    // Wave Q.2.B (B2) — phase-advance-offer surface.
+    phaseAdvanceOffer,
+    confirmAdvance,
+    dismissAdvanceOffer,
+    // Wave Q.2.B (B3) — InvestorType override surface.
+    investorTypeOverride,
+    setInvestorTypeOverride,
   };
 }

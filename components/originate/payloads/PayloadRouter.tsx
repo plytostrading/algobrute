@@ -8,9 +8,16 @@
  * `null` when the shape can't be discriminated — the chat is the
  * source of truth for the conversational text, so a missing renderer
  * never blocks the dialogue.
+ *
+ * Wave Q.2.B (B3) — accepts optional ``onOverrideInvestorType`` +
+ * ``investorTypeOverride`` so Screen1Card can surface the customer-
+ * facing InvestorType override affordance.  The router itself is
+ * stateless; it forwards these straight through to ``Screen1Card``
+ * and ignores them for every other payload kind.
  */
 
 import type {
+  InvestorType,
   RawStructuredPayload,
   TaggedStructuredPayload,
 } from '@/types/originate';
@@ -24,6 +31,15 @@ import DoctorAlertCard from './DoctorAlertCard';
 
 export interface PayloadRouterProps {
   payload: RawStructuredPayload | TaggedStructuredPayload;
+  /** Wave Q.2.B (B3) — forwarded to Screen1Card so the customer can
+   *  correct the engine's inferred InvestorType.  Omit to render the
+   *  card without the override affordance (e.g. static previews). */
+  onOverrideInvestorType?: (investor_type: InvestorType) => void;
+  /** Wave Q.2.B (B3) — currently-buffered override mirrored from
+   *  ``useDialogueSession.investorTypeOverride``.  When non-null,
+   *  Screen1Card renders the confirmation strip instead of the
+   *  [Change ▾] trigger. */
+  investorTypeOverride?: InvestorType | null;
 }
 
 function isTagged(
@@ -37,7 +53,11 @@ function isTagged(
   );
 }
 
-export default function PayloadRouter({ payload }: PayloadRouterProps) {
+export default function PayloadRouter({
+  payload,
+  onOverrideInvestorType,
+  investorTypeOverride,
+}: PayloadRouterProps) {
   const tagged: TaggedStructuredPayload | null = isTagged(payload)
     ? payload
     : tagPayload(payload);
@@ -45,7 +65,13 @@ export default function PayloadRouter({ payload }: PayloadRouterProps) {
 
   switch (tagged.kind) {
     case 'screen1':
-      return <Screen1Card payload={tagged} />;
+      return (
+        <Screen1Card
+          payload={tagged}
+          onOverrideInvestorType={onOverrideInvestorType}
+          pendingOverride={investorTypeOverride}
+        />
+      );
     case 'screen2':
       return <Screen2Card payload={tagged} />;
     case 'screen3':

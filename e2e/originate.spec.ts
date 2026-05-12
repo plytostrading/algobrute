@@ -1208,6 +1208,623 @@ test.describe('/originate — F.1.C Accept-Strategy CTA wiring', () => {
   });
 });
 
+test.describe('/originate — Wave Q.2.B (B2) phase-advance offer', () => {
+  /**
+   * The PhaseAdvanceCard surface is the customer-facing side of the
+   * engine's agent-proposes / user-confirms phase progression flow.
+   * These tests cover the four lifecycle paths:
+   *
+   *   1. ``turn_complete`` with a ``phase_advance_offer`` renders the
+   *      card with the target phase + supporting agents + rationale.
+   *   2. Clicking [Confirm advance] does NOT immediately fire a
+   *      network call — instead the next ``sendUserInput`` carries
+   *      ``confirm_advance_to`` on its handshake.
+   *   3. Clicking [Not yet] dismisses the card; a fresh offer arriving
+   *      on the next ``turn_complete`` re-surfaces the card.
+   *   4. A ``turn_complete`` event with ``phase_advance_offer: null``
+   *      renders no card.
+   */
+
+  /** Build a turn_complete event carrying a phase-advance offer.  The
+   *  shape mirrors ``PhaseAdvanceOffer.model_dump(mode="json")`` —
+   *  lowercase wire ``proposed_phase``, JSON-array ``proposed_by`` and
+   *  ``decision_ids``, ``rationale`` string.  ``structured_payload`` is
+   *  intentionally null so the only visible card is the offer card. */
+  function offerEvent(overrides: {
+    sessionId?: string;
+    currentPhase?: string;
+    proposedPhase: string;
+    proposedBy: string[];
+    rationale: string;
+    decisionIds?: string[];
+    outputText?: string;
+    turnCount?: number;
+  }) {
+    return {
+      event: 'turn_complete' as const,
+      session_id: overrides.sessionId ?? 'sess-b2',
+      output_text: overrides.outputText ?? 'Quorum reached.',
+      current_phase: overrides.currentPhase ?? 'extraction',
+      turn_count: overrides.turnCount ?? 2,
+      structured_payload: null,
+      phase_advance_offer: {
+        proposed_phase: overrides.proposedPhase,
+        proposed_by: overrides.proposedBy,
+        rationale: overrides.rationale,
+        decision_ids:
+          overrides.decisionIds ?? [
+            'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          ],
+      },
+    };
+  }
+
+  /** Read every WebSocket the page's stub has opened, including each
+   *  socket's recorded ``sentMessages`` (the first of which is always
+   *  the JSON handshake the hook sends on ``onopen``). */
+  async function readRecorder(
+    page: Page,
+  ): Promise<Array<{ url: string; sentMessages: string[] }>> {
+    return page.evaluate(() => {
+      const w = window as Window & {
+        __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+      };
+      return w.__dialogueWsRecorder ?? [];
+    });
+  }
+
+  test('turn_complete with a phase_advance_offer renders the PhaseAdvanceCard', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b2',
+        current_phase: 'extraction',
+      },
+      offerEvent({
+        proposedPhase: 'exploration',
+        proposedBy: ['co_author', 'detective'],
+        rationale:
+          'Co-Author and Detective have aligned on the strategy intent; ready to broaden the design space.',
+      }),
+    ]);
+
+    const card = page.getByTestId('phase-advance-card');
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute('data-target-phase', 'exploration');
+    await expect(page.getByTestId('phase-advance-title')).toContainText(
+      'Ready to advance to Exploration?',
+    );
+    await expect(
+      page.getByTestId('phase-advance-supporting-agents'),
+    ).toContainText('co_author, detective have signaled');
+    await expect(page.getByTestId('phase-advance-rationale')).toContainText(
+      'aligned on the strategy intent',
+    );
+
+    // Both CTAs are present.
+    await expect(page.getByTestId('phase-advance-confirm')).toBeEnabled();
+    await expect(page.getByTestId('phase-advance-dismiss')).toBeEnabled();
+  });
+
+  test('clicking [Confirm advance] populates confirm_advance_to on the next handshake', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b2',
+        current_phase: 'validation',
+      },
+      offerEvent({
+        sessionId: 'sess-b2',
+        currentPhase: 'validation',
+        proposedPhase: 'deployment_decision',
+        proposedBy: ['cross_examiner', 'pre_mortem_guide'],
+        rationale: 'Validation reviewers have signed off — ready to deploy.',
+      }),
+    ]);
+
+    const card = page.getByTestId('phase-advance-card');
+    await expect(card).toBeVisible();
+
+    // Confirm — the card disappears immediately + the hook buffers the
+    // target_phase for the next handshake.
+    await page.getByTestId('phase-advance-confirm').click();
+    await expect(card).toHaveCount(0);
+
+    // Send a new user message — opens a fresh socket, sends a handshake
+    // that should now carry confirm_advance_to.
+    await page.getByTestId('originate-input').fill('Yes, advance please');
+    await page.getByTestId('originate-send').click();
+
+    // Wait for the recorder to capture a handshake whose user_input is
+    // the second send.  We can't rely on a fixed socket index because
+    // React strict-mode double-mounting under dev can register more than
+    // one stub WebSocket per send-click cycle; matching by content is
+    // robust to that.
+    await page.waitForFunction(() => {
+      const w = window as Window & {
+        __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+      };
+      const rec = w.__dialogueWsRecorder ?? [];
+      return rec.some((r) =>
+        r.sentMessages.some((m) => {
+          try {
+            const parsed = JSON.parse(m) as { user_input?: unknown };
+            return parsed.user_input === 'Yes, advance please';
+          } catch {
+            return false;
+          }
+        }),
+      );
+    });
+
+    const sockets = await readRecorder(page);
+    const allHandshakes = sockets
+      .flatMap((s) => s.sentMessages)
+      .map((m) => {
+        try {
+          return JSON.parse(m) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .filter((p): p is Record<string, unknown> => p !== null);
+    const confirmHandshake = allHandshakes.find(
+      (h) => h.user_input === 'Yes, advance please',
+    );
+    expect(confirmHandshake).toBeDefined();
+    expect(confirmHandshake?.confirm_advance_to).toBe('deployment_decision');
+    // Session continuity preserved.
+    expect(confirmHandshake?.session_id).toBe('sess-b2');
+
+    // And the prior handshake (the initial "Build me a momentum strategy
+    // on AAPL" send from drivePage) MUST NOT carry confirm_advance_to —
+    // the field is one-shot and only attaches to the post-confirm send.
+    const initialHandshake = allHandshakes.find(
+      (h) => h.user_input === 'Build me a momentum strategy on AAPL',
+    );
+    expect(initialHandshake).toBeDefined();
+    expect(initialHandshake?.confirm_advance_to).toBeUndefined();
+  });
+
+  test('clicking [Not yet] dismisses the card; a fresh offer re-renders it', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b2',
+        current_phase: 'extraction',
+      },
+      offerEvent({
+        proposedPhase: 'exploration',
+        proposedBy: ['co_author'],
+        rationale: 'Co-Author thinks the spec is clear enough to broaden.',
+        turnCount: 2,
+      }),
+    ]);
+
+    const card = page.getByTestId('phase-advance-card');
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute('data-target-phase', 'exploration');
+
+    // Dismiss — card disappears.
+    await page.getByTestId('phase-advance-dismiss').click();
+    await expect(card).toHaveCount(0);
+
+    // Push a fresh turn_complete with a NEW offer (different phase to
+    // make the re-render observable).  The card re-appears.
+    await page.evaluate((e) => {
+      const w = window as Window & {
+        __pushDialogueEvent?: (e: Record<string, unknown>) => void;
+      };
+      w.__pushDialogueEvent?.(e);
+    }, offerEvent({
+      proposedPhase: 'refinement',
+      proposedBy: ['co_author'],
+      rationale: 'Spec ready for iteration.',
+      currentPhase: 'exploration',
+      turnCount: 3,
+    }) as Record<string, unknown>);
+
+    await expect(page.getByTestId('phase-advance-card')).toBeVisible();
+    await expect(page.getByTestId('phase-advance-card')).toHaveAttribute(
+      'data-target-phase',
+      'refinement',
+    );
+    await expect(page.getByTestId('phase-advance-title')).toContainText(
+      'Ready to advance to Refinement?',
+    );
+  });
+
+  test('turn_complete with phase_advance_offer: null renders no card', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b2',
+        current_phase: 'extraction',
+      },
+      {
+        event: 'turn_complete',
+        session_id: 'sess-b2',
+        output_text: 'No quorum yet — continuing the dialogue.',
+        current_phase: 'extraction',
+        turn_count: 2,
+        structured_payload: null,
+        phase_advance_offer: null,
+      },
+    ]);
+
+    // The transcript renders the agent's text but no advance card.
+    await expect(page.getByTestId('originate-transcript')).toContainText(
+      'No quorum yet',
+    );
+    await expect(page.getByTestId('phase-advance-card')).toHaveCount(0);
+    await expect(page.getByTestId('phase-advance-slot')).toHaveCount(0);
+  });
+});
+
+test.describe('/originate — Wave Q.2.B (B3) InvestorType override', () => {
+  /**
+   * B3 closes the "engine inferred without correction" gap on
+   * Screen1Card.  When the engine surfaces a Screen1Payload, the
+   * customer must be able to (a) confirm the inferred InvestorType or
+   * (b) override it.  Selecting an override buffers the value on
+   * ``useDialogueSession.investorTypeOverride``; the NEXT handshake
+   * carries it as ``investor_type`` and the override clears (one-shot
+   * — the engine persists the corrected type into DialogueState so
+   * subsequent turns don't need to re-send).
+   *
+   * Helpers:
+   *   - ``readHandshakes`` parses the JSON envelopes the stub
+   *     WebSocket recorded so each test can assert on the wire shape
+   *     (presence + value of ``investor_type``) without inspecting
+   *     network plumbing.
+   *   - The Screen1Payload fixture below is the same shape used by the
+   *     Phase Q.2 foundation: ``strategy_class`` + ``investor_type`` +
+   *     ``classified_confidence`` are the discriminator key fields.
+   */
+
+  function screen1Event(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      event: 'turn_complete',
+      session_id: 'sess-b3-screen1',
+      output_text: "Here's what we heard.",
+      current_phase: 'exploration',
+      turn_count: 2,
+      phase_advance_offer: null,
+      structured_payload: {
+        // Use a key set that ONLY matches Screen1: strategy_class +
+        // classified_confidence (no `verdict`, no `build_description`,
+        // no `challenges`, no `scenarios_surfaced`, no `trigger`).
+        strategy_class: 'momentum',
+        investor_type: 'long_term_investor',
+        classified_confidence: 0.78,
+        summary: 'A long-bias momentum strategy on AAPL.',
+        ticker: 'AAPL',
+        ...overrides,
+      },
+    };
+  }
+
+  async function readHandshakes(
+    page: Page,
+  ): Promise<Array<Record<string, unknown>>> {
+    return page.evaluate(() => {
+      interface RecorderWindow extends Window {
+        __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+      }
+      const recorder = (window as RecorderWindow).__dialogueWsRecorder ?? [];
+      const parsed: Array<Record<string, unknown>> = [];
+      for (const rec of recorder) {
+        for (const raw of rec.sentMessages) {
+          try {
+            const obj = JSON.parse(raw) as Record<string, unknown>;
+            // Skip heartbeat pings so callers only see handshakes.
+            if (obj.event === 'ping') continue;
+            parsed.push(obj);
+          } catch {
+            // Skip un-parseable payloads silently.
+          }
+        }
+      }
+      return parsed;
+    });
+  }
+
+  test('Screen1Payload renders with InvestorType + the [Change ▾] affordance', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b3-screen1',
+        current_phase: 'extraction',
+      },
+      screen1Event(),
+    ]);
+
+    // The Screen1 card renders with the engine-inferred investor type.
+    const card = page.getByTestId('payload-screen1');
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId('screen1-investor-type')).toContainText(
+      'Long-term Investor',
+    );
+
+    // The override affordance is present (B3 gap closure).
+    const trigger = page.getByTestId('screen1-investor-override-trigger');
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText('Change');
+
+    // Trust-building info affordance is present.
+    await expect(
+      page.getByTestId('screen1-investor-override-info'),
+    ).toBeVisible();
+  });
+
+  test('clicking [Change ▾] reveals all 7 InvestorType options with labels + descriptions', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b3-screen1',
+        current_phase: 'extraction',
+      },
+      screen1Event(),
+    ]);
+
+    await page.getByTestId('screen1-investor-override-trigger').click();
+    const menu = page.getByTestId('screen1-investor-override-menu');
+    await expect(menu).toBeVisible();
+
+    // All 7 canonical InvestorType values are present, each as a
+    // dedicated DropdownMenuItem.  The labels + one-line descriptions
+    // from the spec must surface verbatim so the trust-building copy
+    // doesn't drift away from the agreed wording.
+    const expected: Array<{ value: string; label: string; description: string }> = [
+      {
+        value: 'long_term_investor',
+        label: 'Long-term Investor',
+        description: 'Buy-and-hold, multi-year horizon, low turnover',
+      },
+      {
+        value: 'value_investor',
+        label: 'Value Investor',
+        description: 'Fundamental contrarian, margin-of-safety, patience',
+      },
+      {
+        value: 'growth_investor',
+        label: 'Growth Investor',
+        description: 'Quality compounding, fundamental + momentum',
+      },
+      {
+        value: 'income_investor',
+        label: 'Income Investor',
+        description: 'Yield/dividend focus, possibly options-for-income',
+      },
+      {
+        value: 'swing_trader',
+        label: 'Swing Trader',
+        description: 'Technical setups, regime-aware, days-to-weeks holds',
+      },
+      {
+        value: 'options_strategy_player',
+        label: 'Options Strategist',
+        description: 'Premium-selling, vol-aware, defined risk',
+      },
+      {
+        value: 'undeclared',
+        label: 'Investor (undeclared)',
+        description: "I'd rather not specify",
+      },
+    ];
+
+    for (const opt of expected) {
+      const item = page.getByTestId(
+        `screen1-investor-override-option-${opt.value}`,
+      );
+      await expect(item).toBeVisible();
+      await expect(item).toContainText(opt.label);
+      await expect(item).toContainText(opt.description);
+    }
+  });
+
+  test('selecting an override persists the override + next handshake JSON includes investor_type=<override>', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b3-screen1',
+        current_phase: 'extraction',
+      },
+      screen1Event(),
+    ]);
+
+    // Open the dropdown + pick "Swing Trader".
+    await page.getByTestId('screen1-investor-override-trigger').click();
+    await page
+      .getByTestId('screen1-investor-override-option-swing_trader')
+      .click();
+
+    // The confirmation strip surfaces with the chosen label and the
+    // exact "We'll re-classify on your next message as ..." copy.
+    // Note the JSX renders `We&apos;ll` which serialises as the ASCII
+    // apostrophe — so the assertion uses the same ASCII form.
+    const confirm = page.getByTestId(
+      'screen1-investor-override-confirmation',
+    );
+    await expect(confirm).toBeVisible();
+    await expect(confirm).toHaveAttribute('data-override-value', 'swing_trader');
+    await expect(confirm).toContainText(
+      "We'll re-classify on your next message as",
+    );
+    await expect(confirm).toContainText('Swing Trader');
+
+    // [Cancel] is rendered alongside the confirmation.
+    await expect(
+      page.getByTestId('screen1-investor-override-cancel'),
+    ).toBeVisible();
+
+    // Snapshot the handshake count BEFORE sending the next message —
+    // selecting an override should NOT itself open a fresh socket.
+    const handshakesBefore = await readHandshakes(page);
+    const screen1HandshakeCount = handshakesBefore.length;
+
+    // Send the next user message.  The handshake on the freshly
+    // opened socket must carry ``investor_type: "swing_trader"``.
+    await page
+      .getByTestId('originate-input')
+      .fill('Make it more conservative.');
+    await page.getByTestId('originate-send').click();
+    await expect(page.getByTestId('originate-message-user').last()).toContainText(
+      'Make it more conservative.',
+    );
+
+    // Wait for the next stub socket to open + the handshake to land.
+    await page.waitForFunction(
+      (prevCount) => {
+        interface RecorderWindow extends Window {
+          __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+        }
+        const recorder =
+          (window as RecorderWindow).__dialogueWsRecorder ?? [];
+        const total = recorder.reduce(
+          (acc, r) =>
+            acc +
+            r.sentMessages.filter((m) => {
+              try {
+                return (JSON.parse(m) as { event?: string }).event !== 'ping';
+              } catch {
+                return true;
+              }
+            }).length,
+          0,
+        );
+        return total > prevCount;
+      },
+      screen1HandshakeCount,
+    );
+
+    const handshakesAfter = await readHandshakes(page);
+    // The latest handshake — sent on the freshly opened socket — must
+    // carry the override.
+    const latest = handshakesAfter[handshakesAfter.length - 1];
+    expect(latest).toBeDefined();
+    expect(latest.investor_type).toBe('swing_trader');
+    expect(latest.user_input).toBe('Make it more conservative.');
+  });
+
+  test('one-shot override semantics — a second message after override-handshake does NOT carry investor_type', async ({
+    page,
+  }) => {
+    await drivePage(page, [
+      {
+        event: 'turn_started',
+        session_id: 'sess-b3-screen1',
+        current_phase: 'extraction',
+      },
+      screen1Event(),
+    ]);
+
+    // Pick the override.
+    await page.getByTestId('screen1-investor-override-trigger').click();
+    await page
+      .getByTestId('screen1-investor-override-option-options_strategy_player')
+      .click();
+    await expect(
+      page.getByTestId('screen1-investor-override-confirmation'),
+    ).toBeVisible();
+
+    // Snapshot handshake count BEFORE sending the first follow-up.
+    const beforeFirst = (await readHandshakes(page)).length;
+
+    // Send first follow-up — handshake should carry investor_type.
+    await page
+      .getByTestId('originate-input')
+      .fill('Premium-selling on SPY weeklies.');
+    await page.getByTestId('originate-send').click();
+    await page.waitForFunction(
+      (prev) => {
+        interface RecorderWindow extends Window {
+          __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+        }
+        const recorder =
+          (window as RecorderWindow).__dialogueWsRecorder ?? [];
+        const total = recorder.reduce(
+          (acc, r) =>
+            acc +
+            r.sentMessages.filter((m) => {
+              try {
+                return (JSON.parse(m) as { event?: string }).event !== 'ping';
+              } catch {
+                return true;
+              }
+            }).length,
+          0,
+        );
+        return total > prev;
+      },
+      beforeFirst,
+    );
+    const afterFirst = await readHandshakes(page);
+    const firstHandshake = afterFirst[afterFirst.length - 1];
+    expect(firstHandshake.investor_type).toBe('options_strategy_player');
+
+    // The confirmation strip should disappear after the override
+    // drains into the handshake (one-shot semantics — investorTypeOverride
+    // state was cleared inside ws.onopen).
+    await expect(
+      page.getByTestId('screen1-investor-override-confirmation'),
+    ).toHaveCount(0);
+
+    // Snapshot handshake count BEFORE the second send.
+    const beforeSecond = afterFirst.length;
+
+    // Send second follow-up — handshake should NOT carry
+    // investor_type (the buffered override was one-shot).
+    await page.getByTestId('originate-input').fill('Now widen the strikes.');
+    await page.getByTestId('originate-send').click();
+    await page.waitForFunction(
+      (prev) => {
+        interface RecorderWindow extends Window {
+          __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+        }
+        const recorder =
+          (window as RecorderWindow).__dialogueWsRecorder ?? [];
+        const total = recorder.reduce(
+          (acc, r) =>
+            acc +
+            r.sentMessages.filter((m) => {
+              try {
+                return (JSON.parse(m) as { event?: string }).event !== 'ping';
+              } catch {
+                return true;
+              }
+            }).length,
+          0,
+        );
+        return total > prev;
+      },
+      beforeSecond,
+    );
+    const afterSecond = await readHandshakes(page);
+    const secondHandshake = afterSecond[afterSecond.length - 1];
+    expect(secondHandshake.user_input).toBe('Now widen the strikes.');
+    // KEY ASSERTION — the second handshake does NOT re-carry
+    // investor_type.  The engine persists the corrected type into
+    // DialogueState; re-sending would be both wasteful and
+    // ambiguous if the customer later picks again.
+    expect(secondHandshake.investor_type).toBeUndefined();
+  });
+});
+
 test.describe('/originate — payload discriminator unit tests (run via Playwright)', () => {
   /**
    * Unit-level discriminator coverage — the discriminator is a pure
@@ -1246,5 +1863,338 @@ test.describe('/originate — payload discriminator unit tests (run via Playwrig
       expect(result.hasTag).toBeTruthy();
       expect(result.hasDetect).toBeTruthy();
     }
+  });
+});
+
+// =============================================================================
+// Wave Q.2.B (B4) — artifact attachment surface
+// =============================================================================
+//
+// The /originate composer now exposes a paperclip button between the input
+// field and the [Send] button.  Customers attach one of five artifact types
+// (PineScript paste, Paper PDF, Chart screenshot, Composer JSON, Reference
+// URL); the engine's Detective agent ingests the artifact_content +
+// artifact_source_type via the existing tool_sanitization pipeline.
+//
+// These tests stub the WebSocket (same harness as the other suites) and
+// inspect the captured handshake payload to verify the artifact fields
+// land on the wire.
+
+/** Extract every parsed handshake payload from the page's WS recorder. */
+async function readAllHandshakes(
+  page: Page,
+): Promise<Array<Record<string, unknown>>> {
+  return page.evaluate(() => {
+    interface RecorderWindow extends Window {
+      __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+    }
+    const recorder = (window as RecorderWindow).__dialogueWsRecorder ?? [];
+    const parsed: Array<Record<string, unknown>> = [];
+    for (const rec of recorder) {
+      for (const raw of rec.sentMessages) {
+        try {
+          const obj = JSON.parse(raw) as Record<string, unknown>;
+          if ('user_input' in obj && 'token' in obj) parsed.push(obj);
+        } catch {
+          // ignore — heartbeat pings etc.
+        }
+      }
+    }
+    return parsed;
+  });
+}
+
+test.describe('/originate — Wave Q.2.B (B4) artifact attachment surface', () => {
+  test('attach button is visible in the composer and opens the attachment sheet', async ({
+    page,
+  }) => {
+    await withAuth(page);
+    await stubWebSocket(page);
+    await page.goto('/originate');
+    await expect(page.getByTestId('originate-page')).toBeVisible();
+
+    const trigger = page.getByTestId('originate-attach-button');
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+
+    await expect(page.getByTestId('originate-attachment-sheet')).toBeVisible();
+    // All five tabs are reachable.
+    await expect(page.getByTestId('originate-attach-tab-pinescript')).toBeVisible();
+    await expect(page.getByTestId('originate-attach-tab-paper')).toBeVisible();
+    await expect(page.getByTestId('originate-attach-tab-chart')).toBeVisible();
+    await expect(page.getByTestId('originate-attach-tab-composer')).toBeVisible();
+    await expect(page.getByTestId('originate-attach-tab-url')).toBeVisible();
+  });
+
+  test('PineScript tab — paste code → submit → handshake carries artifact_content + pinescript source_type', async ({
+    page,
+  }) => {
+    await withAuth(page);
+    await stubWebSocket(page);
+    const refreshLanded = page.waitForResponse(
+      (resp) => resp.url().includes('/auth/refresh') && resp.status() === 200,
+    );
+    await page.goto('/originate');
+    await refreshLanded;
+    await expect(page.getByTestId('originate-page')).toBeVisible();
+
+    await page.getByTestId('originate-attach-button').click();
+    await expect(page.getByTestId('originate-attachment-sheet')).toBeVisible();
+
+    const pineCode = `//@version=5\nindicator("Momentum", overlay=true)\nplot(ta.ema(close, 20))`;
+    await page
+      .getByTestId('originate-attach-pinescript-input')
+      .fill(pineCode);
+    await page.getByTestId('originate-attach-pinescript-submit').click();
+
+    // Sheet closes; preview chip surfaces alongside the trigger button.
+    await expect(page.getByTestId('originate-attachment-sheet')).toHaveCount(0);
+    await expect(page.getByTestId('originate-attachment-preview')).toBeVisible();
+
+    await page
+      .getByTestId('originate-input')
+      .fill('Here is a PineScript I want to backtest');
+    await page.getByTestId('originate-send').click();
+    await expect(page.getByTestId('originate-message-user').first()).toBeVisible();
+
+    // Wait for the handshake to land.
+    await page.waitForFunction(() => {
+      interface RecorderWindow extends Window {
+        __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+      }
+      const recorder = (window as RecorderWindow).__dialogueWsRecorder ?? [];
+      return recorder.some((rec) =>
+        rec.sentMessages.some((m) => {
+          try {
+            const parsed = JSON.parse(m) as Record<string, unknown>;
+            return 'user_input' in parsed && 'token' in parsed;
+          } catch {
+            return false;
+          }
+        }),
+      );
+    });
+
+    const handshakes = await readAllHandshakes(page);
+    expect(handshakes.length).toBeGreaterThanOrEqual(1);
+    const handshake = handshakes[0];
+    expect(handshake.artifact_source_type).toBe('pinescript');
+    expect(handshake.artifact_content).toBe(pineCode);
+  });
+
+  test('Paper PDF tab — upload file → handshake carries base64 content + pdf source_type', async ({
+    page,
+  }) => {
+    await withAuth(page);
+    await stubWebSocket(page);
+    const refreshLanded = page.waitForResponse(
+      (resp) => resp.url().includes('/auth/refresh') && resp.status() === 200,
+    );
+    await page.goto('/originate');
+    await refreshLanded;
+    await expect(page.getByTestId('originate-page')).toBeVisible();
+
+    await page.getByTestId('originate-attach-button').click();
+    await page.getByTestId('originate-attach-tab-paper').click();
+
+    // Synthesise a fake PDF file via the playwright file-input API.
+    const fakePdfBytes = Buffer.from('%PDF-1.4\n%fake pdf content for test\n%%EOF');
+    await page.getByTestId('originate-attach-pdf-input').setInputFiles({
+      name: 'momentum_paper.pdf',
+      mimeType: 'application/pdf',
+      buffer: fakePdfBytes,
+    });
+
+    // Preview chip appears in the sheet.
+    await expect(page.getByTestId('originate-attach-pdf-preview')).toContainText(
+      'momentum_paper.pdf',
+    );
+
+    await page.getByTestId('originate-attach-paper-submit').click();
+    await expect(page.getByTestId('originate-attachment-sheet')).toHaveCount(0);
+    await expect(page.getByTestId('originate-attachment-preview')).toContainText(
+      'momentum_paper.pdf',
+    );
+
+    await page.getByTestId('originate-input').fill('Read this paper');
+    await page.getByTestId('originate-send').click();
+    await expect(page.getByTestId('originate-message-user').first()).toBeVisible();
+
+    await page.waitForFunction(() => {
+      interface RecorderWindow extends Window {
+        __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+      }
+      const recorder = (window as RecorderWindow).__dialogueWsRecorder ?? [];
+      return recorder.some((rec) =>
+        rec.sentMessages.some((m) => {
+          try {
+            const parsed = JSON.parse(m) as Record<string, unknown>;
+            return 'user_input' in parsed && 'token' in parsed;
+          } catch {
+            return false;
+          }
+        }),
+      );
+    });
+
+    const handshakes = await readAllHandshakes(page);
+    expect(handshakes.length).toBeGreaterThanOrEqual(1);
+    const handshake = handshakes[0];
+    expect(handshake.artifact_source_type).toBe('pdf');
+    // The content should be the base64-encoded body of the PDF; a strict
+    // string compare is brittle (the FileReader's base64 alignment can
+    // vary by browser).  We only assert it is non-empty + matches the
+    // base64 alphabet.
+    expect(typeof handshake.artifact_content).toBe('string');
+    expect(handshake.artifact_content as string).toMatch(/^[A-Za-z0-9+/=]+$/);
+    expect((handshake.artifact_content as string).length).toBeGreaterThan(0);
+  });
+
+  test('200KB limit — paste >200K content → submit blocked with size-exceeded gate', async ({
+    page,
+  }) => {
+    await withAuth(page);
+    await stubWebSocket(page);
+    await page.goto('/originate');
+    await expect(page.getByTestId('originate-page')).toBeVisible();
+
+    await page.getByTestId('originate-attach-button').click();
+    await page.getByTestId('originate-attach-tab-pinescript').click();
+
+    // 250_000 chars — well over the 200_000 ceiling.  Set via evaluate
+    // to mirror a pasted blob (and avoid keystroke-event slowdown).
+    const overflow = 'x'.repeat(250_000);
+    await page.evaluate((text) => {
+      const el = document.querySelector(
+        '[data-testid="originate-attach-pinescript-input"]',
+      ) as HTMLTextAreaElement | null;
+      if (!el) throw new Error('PineScript textarea not found');
+      const proto = Object.getPrototypeOf(el) as {
+        __lookupSetter__: (k: string) => ((v: string) => void) | undefined;
+      };
+      const setter = proto.__lookupSetter__('value');
+      if (setter) {
+        setter.call(el, text);
+      } else {
+        el.value = text;
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, overflow);
+
+    // Byte-counter renders the actual character count.
+    await expect(
+      page.getByTestId('originate-attach-pinescript-counter'),
+    ).toContainText('250,000');
+
+    // Submit button disables when content is over the 200K ceiling.
+    await expect(
+      page.getByTestId('originate-attach-pinescript-submit'),
+    ).toBeDisabled();
+  });
+
+  test('after send, the chat message badge shows the attached label + size', async ({
+    page,
+  }) => {
+    await withAuth(page);
+    await stubWebSocket(page);
+    const refreshLanded = page.waitForResponse(
+      (resp) => resp.url().includes('/auth/refresh') && resp.status() === 200,
+    );
+    await page.goto('/originate');
+    await refreshLanded;
+    await expect(page.getByTestId('originate-page')).toBeVisible();
+
+    await page.getByTestId('originate-attach-button').click();
+    await page.getByTestId('originate-attach-tab-pinescript').click();
+    await page
+      .getByTestId('originate-attach-pinescript-input')
+      .fill('// some pine code\nplot(close)');
+    await page.getByTestId('originate-attach-pinescript-submit').click();
+    await expect(page.getByTestId('originate-attachment-sheet')).toHaveCount(0);
+
+    await page.getByTestId('originate-input').fill('Backtest this please');
+    await page.getByTestId('originate-send').click();
+
+    await expect(page.getByTestId('originate-message-user').first()).toBeVisible();
+    const badge = page.getByTestId('originate-message-attachment-badge').first();
+    await expect(badge).toBeVisible();
+    await expect(badge).toContainText('PineScript paste');
+    await expect(badge).toHaveAttribute('data-source-type', 'pinescript');
+  });
+
+  test('attachment is one-shot — second send carries no artifact unless the user attaches again', async ({
+    page,
+  }) => {
+    await withAuth(page);
+    await stubWebSocket(page);
+    const refreshLanded = page.waitForResponse(
+      (resp) => resp.url().includes('/auth/refresh') && resp.status() === 200,
+    );
+    await page.goto('/originate');
+    await refreshLanded;
+    await expect(page.getByTestId('originate-page')).toBeVisible();
+
+    // First turn — attach + send.
+    await page.getByTestId('originate-attach-button').click();
+    await page.getByTestId('originate-attach-tab-url').click();
+    await page
+      .getByTestId('originate-attach-url-input')
+      .fill('https://example.com/paper');
+    await page.getByTestId('originate-attach-url-submit').click();
+    await page.getByTestId('originate-input').fill('Round one');
+    await page.getByTestId('originate-send').click();
+
+    await page.waitForFunction(() => {
+      interface RecorderWindow extends Window {
+        __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+      }
+      const recorder = (window as RecorderWindow).__dialogueWsRecorder ?? [];
+      let count = 0;
+      for (const rec of recorder) {
+        for (const m of rec.sentMessages) {
+          try {
+            const parsed = JSON.parse(m) as Record<string, unknown>;
+            if ('user_input' in parsed && 'token' in parsed) count += 1;
+          } catch {
+            // ignore
+          }
+        }
+      }
+      return count >= 1;
+    });
+
+    // Second turn — type + send WITHOUT attaching.  Composer should
+    // already be clean (the preview chip cleared on first send).
+    await expect(page.getByTestId('originate-attachment-preview')).toHaveCount(0);
+    await page.getByTestId('originate-input').fill('Round two');
+    await page.getByTestId('originate-send').click();
+    await expect(page.getByTestId('originate-message-user').nth(1)).toBeVisible();
+
+    await page.waitForFunction(() => {
+      interface RecorderWindow extends Window {
+        __dialogueWsRecorder?: Array<{ url: string; sentMessages: string[] }>;
+      }
+      const recorder = (window as RecorderWindow).__dialogueWsRecorder ?? [];
+      let count = 0;
+      for (const rec of recorder) {
+        for (const m of rec.sentMessages) {
+          try {
+            const parsed = JSON.parse(m) as Record<string, unknown>;
+            if ('user_input' in parsed && 'token' in parsed) count += 1;
+          } catch {
+            // ignore
+          }
+        }
+      }
+      return count >= 2;
+    });
+
+    const handshakes = await readAllHandshakes(page);
+    expect(handshakes.length).toBeGreaterThanOrEqual(2);
+    expect(handshakes[0]?.artifact_source_type).toBe('video_transcript');
+    expect(handshakes[0]?.artifact_content).toBe('https://example.com/paper');
+    // Second handshake does NOT carry an artifact.
+    expect(handshakes[1]?.artifact_source_type).toBeUndefined();
+    expect(handshakes[1]?.artifact_content).toBeUndefined();
   });
 });

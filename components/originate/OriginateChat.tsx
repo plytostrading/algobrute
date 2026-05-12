@@ -14,18 +14,43 @@
  *     newline).  Connection state surfaced inline.
  *   - Auto-scrolls to the latest message on any new content (text OR
  *     payload deltas).
+ *
+ * Wave Q.2.B (B2) — phase-advance offer affordance.  When the engine
+ * surfaces a ``phase_advance_offer`` on ``turn_complete``, ``PhaseAdvanceCard``
+ * is rendered sticky at the top of the chat panel; [Confirm advance]
+ * threads ``confirm_advance_to`` onto the next handshake (one-shot per
+ * customer click).  [Not yet] dismisses the card locally until the
+ * engine re-surfaces it on a subsequent turn.
  */
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import PayloadRouter from '@/components/originate/payloads/PayloadRouter';
+import PhaseAdvanceCard from '@/components/originate/PhaseAdvanceCard';
+// Wave Q.2.B (B4) — artifact attachment surface (PineScript / Paper /
+// Chart / Composer / URL).  Mounted between the textarea and Send
+// button; pending attachment is held in this component and forwarded
+// on next send.
+import AttachmentButton from '@/components/originate/AttachmentButton';
 import type {
   ConnectionState,
+  DialogueAttachmentPayload,
   DialogueMessage,
   UseDialogueSessionReturn,
 } from '@/hooks/useDialogueSession';
+import type { InvestorType } from '@/types/originate';
+
+/** Wave Q.2.B (B4) — humanise the post-send attachment size for the
+ *  user-message badge.  Mirrors the byte-counter inside
+ *  AttachmentButton so the same convention is used pre-send (composer
+ *  sheet) and post-send (transcript badge). */
+function formatAttachmentSize(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 interface OriginateChatProps {
   /** Active dialogue session — owned by the page (single useDialogueSession() instance). */
@@ -45,7 +70,21 @@ function connectionLabel(state: ConnectionState): string | null {
   }
 }
 
-function MessageRow({ message }: { message: DialogueMessage }) {
+interface MessageRowProps {
+  message: DialogueMessage;
+  /** Wave Q.2.B (B3) — forwarded to ``PayloadRouter`` so Screen1Card
+   *  can surface the InvestorType override affordance. */
+  onOverrideInvestorType?: (investor_type: InvestorType) => void;
+  /** Wave Q.2.B (B3) — buffered override from
+   *  ``useDialogueSession.investorTypeOverride``. */
+  investorTypeOverride?: InvestorType | null;
+}
+
+function MessageRow({
+  message,
+  onOverrideInvestorType,
+  investorTypeOverride,
+}: MessageRowProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const payloads = message.structured_payloads ?? [];
@@ -79,6 +118,25 @@ function MessageRow({ message }: { message: DialogueMessage }) {
             </div>
           )}
           <div className="whitespace-pre-wrap break-words">{message.text}</div>
+          {/* Wave Q.2.B (B4) — attached-artifact badge on user rows.
+              Rendered inside the bubble so the badge inherits the
+              user-message tint and stays anchored to the relevant
+              turn even when the transcript scrolls. */}
+          {isUser && message.attachment_meta && (
+            <div
+              data-testid="originate-message-attachment-badge"
+              data-source-type={message.attachment_meta.sourceType}
+              className="mt-1 flex items-center gap-1.5 text-[11px] opacity-80"
+            >
+              <Paperclip className="h-3 w-3" />
+              <span className="truncate">
+                Attached: {message.attachment_meta.label}
+              </span>
+              <span className="opacity-75">
+                ({formatAttachmentSize(message.attachment_meta.size)})
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -88,7 +146,12 @@ function MessageRow({ message }: { message: DialogueMessage }) {
           data-testid="originate-message-payloads"
         >
           {payloads.map((p, idx) => (
-            <PayloadRouter key={`${message.id}-payload-${idx}`} payload={p} />
+            <PayloadRouter
+              key={`${message.id}-payload-${idx}`}
+              payload={p}
+              onOverrideInvestorType={onOverrideInvestorType}
+              investorTypeOverride={investorTypeOverride}
+            />
           ))}
         </div>
       )}
@@ -97,9 +160,26 @@ function MessageRow({ message }: { message: DialogueMessage }) {
 }
 
 export default function OriginateChat({ session }: OriginateChatProps) {
-  const { messages, sendUserInput, connectionState } = session;
+  const {
+    messages,
+    sendUserInput,
+    connectionState,
+    // Wave Q.2.B (B2) — phase-advance-offer surface.
+    phaseAdvanceOffer,
+    confirmAdvance,
+    dismissAdvanceOffer,
+    // Wave Q.2.B (B3) — InvestorType override surface.
+    investorTypeOverride,
+    setInvestorTypeOverride,
+  } = session;
 
   const [input, setInput] = useState('');
+  /** Wave Q.2.B (B4) — pending attachment held in composer state until
+   *  the send button fires.  Single-attachment-at-a-time: the
+   *  ``AttachmentButton`` surfaces a preview chip + remove control
+   *  while the attachment is staged; ``handleSend`` clears it on send. */
+  const [pendingAttachment, setPendingAttachment] =
+    useState<DialogueAttachmentPayload | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll on new message OR new payload delta (a `turn_complete`
@@ -122,8 +202,14 @@ export default function OriginateChat({ session }: OriginateChatProps) {
   const handleSend = () => {
     const value = input.trim();
     if (!value) return;
-    sendUserInput(value);
+    // Wave Q.2.B (B4) — forward the pending attachment alongside the
+    // text input.  The hook is responsible for size validation; we
+    // clear the local pending state regardless so the next turn starts
+    // with a clean composer (the size-reject error surfaces via the
+    // session ``errorDetail`` + a system message in the transcript).
+    sendUserInput(value, pendingAttachment ?? undefined);
     setInput('');
+    setPendingAttachment(null);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -135,6 +221,19 @@ export default function OriginateChat({ session }: OriginateChatProps) {
 
   return (
     <div className="flex h-full min-h-[480px] flex-col" data-testid="originate-chat">
+      {/* Wave Q.2.B (B2) — phase-advance offer affordance, sticky at the
+          top of the chat panel.  Renders only while an offer is in flight;
+          the card itself returns null when ``offer === null`` so the
+          surrounding layout flexes naturally. */}
+      {phaseAdvanceOffer !== null && (
+        <div className="mb-3" data-testid="phase-advance-slot">
+          <PhaseAdvanceCard
+            offer={phaseAdvanceOffer}
+            onConfirm={confirmAdvance}
+            onDismiss={dismissAdvanceOffer}
+          />
+        </div>
+      )}
       <div
         ref={transcriptRef}
         className="flex-1 overflow-y-auto rounded-md border bg-background/50 p-4"
@@ -151,7 +250,12 @@ export default function OriginateChat({ session }: OriginateChatProps) {
         ) : (
           <div className="flex flex-col gap-3">
             {messages.map((m) => (
-              <MessageRow key={m.id} message={m} />
+              <MessageRow
+                key={m.id}
+                message={m}
+                onOverrideInvestorType={setInvestorTypeOverride}
+                investorTypeOverride={investorTypeOverride}
+              />
             ))}
           </div>
         )}
@@ -181,6 +285,15 @@ export default function OriginateChat({ session }: OriginateChatProps) {
             'placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
             'disabled:cursor-not-allowed disabled:opacity-50',
           )}
+        />
+        {/* Wave Q.2.B (B4) — artifact attachment composer surface,
+            anchored between the textarea and the Send button so the
+            paperclip sits in a familiar place for customers used to
+            chat clients.  Pending attachment is forwarded on send. */}
+        <AttachmentButton
+          attachment={pendingAttachment}
+          onChange={setPendingAttachment}
+          disabled={isBusy}
         />
         <Button
           type="button"

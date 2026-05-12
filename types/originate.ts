@@ -319,3 +319,39 @@ export type TaggedStructuredPayload =
 
 /** Raw wire shape — the union value emitted by the engine, untagged. */
 export type RawStructuredPayload = Record<string, unknown>;
+
+// ---------------------------------------------------------------------------
+// Phase-advance offer (Phase Q.2.B B2 — agent-proposes / user-confirms flow)
+// ---------------------------------------------------------------------------
+
+/**
+ * Surface payload offering a phase advance after agent quorum is met.
+ *
+ * Mirrors `src/algobrute/origination/dialogue/state.py::PhaseAdvanceOffer`
+ * 1:1.  Emitted by the engine on `turn_complete` events when the
+ * per-phase quorum rule (`any` or `all`) is satisfied by accumulated
+ * `phase_advance_proposal` DecisionRecord entries.  The frontend renders
+ * a "Ready to move to {phase}" affordance; the customer confirms by
+ * supplying `DialogueHandshake.confirm_advance_to` on the next turn.
+ *
+ * Wire format:
+ *   - `proposed_phase` carries the lowercase ``DialoguePhase.value``
+ *     (e.g. ``"validation"``, ``"deployment_decision"``) — same wire
+ *     format the hook normalises elsewhere via `normalisePhase()`.
+ *   - `proposed_by` is the JSON-array form of the engine's
+ *     ``tuple[str, ...]`` of agent_ids that proposed the advance.
+ *   - `rationale` is the orchestrator-composed human-readable copy.
+ *   - `decision_ids` is the JSON-array form of the underlying proposal
+ *     decision UUIDs — currently passed through for audit but not
+ *     surfaced in the UI.
+ */
+export interface PhaseAdvanceOffer {
+  /** Lowercase wire value of the target phase (e.g. ``"validation"``). */
+  proposed_phase: string;
+  /** Agent ids whose proposals satisfied the quorum, in proposal order. */
+  proposed_by: string[];
+  /** Human-readable rationale composed by the orchestrator. */
+  rationale: string;
+  /** UUID strings of underlying ``phase_advance_proposal`` records. */
+  decision_ids: string[];
+}
