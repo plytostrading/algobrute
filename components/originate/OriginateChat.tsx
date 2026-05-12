@@ -3,22 +3,24 @@
 /**
  * OriginateChat — chat-style transcript + composer for the /originate page.
  *
- * Wave 1.A (F.1.A) — SKELETON renderer:
- *   - Renders the message history from useDialogueSession() as plain text
- *     rows grouped by sender.
- *   - Exposes a textarea + send button for user input (Enter to send,
- *     Shift+Enter for newline).
- *   - Shows the current connection state inline ("Reconnecting…", etc.).
- *
- * F.1.B will replace the plain-text agent rows with structured renderers
- * (Screen1 = clarifying-questions, Screen2 = light-backtest progress,
- * Screen3 = verdict + disclosures + Accept CTA).
+ * Wave 1.B (F.1.B) — structured-payload aware:
+ *   - Renders the message history from useDialogueSession() with both the
+ *     conversational text AND any structured payloads attached to the
+ *     message (Screen1 / Screen2 / Screen3 / Challenge / PreMortem /
+ *     DoctorAlert) via ``PayloadRouter``.
+ *   - Visual hierarchy: text bubble → structured card(s) → next message,
+ *     with breathing room between each pair.
+ *   - Composer: textarea + send button (Enter to send, Shift+Enter for
+ *     newline).  Connection state surfaced inline.
+ *   - Auto-scrolls to the latest message on any new content (text OR
+ *     payload deltas).
  */
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import PayloadRouter from '@/components/originate/payloads/PayloadRouter';
 import type {
   ConnectionState,
   DialogueMessage,
@@ -46,31 +48,50 @@ function connectionLabel(state: ConnectionState): string | null {
 function MessageRow({ message }: { message: DialogueMessage }) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+  const payloads = message.structured_payloads ?? [];
+  const hasText = message.text.trim().length > 0;
 
+  // Agent rows with structured payloads render full-width (so the cards
+  // breathe), even though the text bubble stays capped at 80%.  User
+  // rows never carry payloads; system rows are kept narrow.
   return (
     <div
       data-testid={`originate-message-${message.role}`}
       data-message-id={message.id}
+      data-has-payloads={payloads.length > 0 ? 'true' : 'false'}
       className={cn(
-        'flex w-full gap-3',
-        isUser ? 'justify-end' : 'justify-start',
+        'flex w-full flex-col gap-2',
+        isUser ? 'items-end' : 'items-start',
       )}
     >
-      <div
-        className={cn(
-          'max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed',
-          isUser && 'bg-primary text-primary-foreground',
-          !isUser && !isSystem && 'bg-muted',
-          isSystem && 'border border-dashed border-muted-foreground/30 bg-transparent text-muted-foreground italic',
-        )}
-      >
-        {!isUser && message.agentId && (
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">
-            {message.agentId}
-          </div>
-        )}
-        <div className="whitespace-pre-wrap break-words">{message.text}</div>
-      </div>
+      {hasText && (
+        <div
+          className={cn(
+            'max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed',
+            isUser && 'bg-primary text-primary-foreground',
+            !isUser && !isSystem && 'bg-muted',
+            isSystem && 'border border-dashed border-muted-foreground/30 bg-transparent text-muted-foreground italic',
+          )}
+        >
+          {!isUser && message.agentId && (
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">
+              {message.agentId}
+            </div>
+          )}
+          <div className="whitespace-pre-wrap break-words">{message.text}</div>
+        </div>
+      )}
+
+      {payloads.length > 0 && (
+        <div
+          className="w-full max-w-2xl flex flex-col gap-2"
+          data-testid="originate-message-payloads"
+        >
+          {payloads.map((p, idx) => (
+            <PayloadRouter key={`${message.id}-payload-${idx}`} payload={p} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -81,13 +102,19 @@ export default function OriginateChat({ session }: OriginateChatProps) {
   const [input, setInput] = useState('');
   const transcriptRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll on new message.
+  // Auto-scroll on new message OR new payload delta (a `turn_complete`
+  // can attach payloads to an existing message without growing the
+  // length, so we also watch the payload-count fingerprint).
+  const payloadFingerprint = messages.reduce(
+    (acc, m) => acc + (m.structured_payloads?.length ?? 0),
+    0,
+  );
   useEffect(() => {
     const el = transcriptRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages.length]);
+  }, [messages.length, payloadFingerprint]);
 
   const isBusy = connectionState === 'connecting' || connectionState === 'reconnecting';
   const status = connectionLabel(connectionState);

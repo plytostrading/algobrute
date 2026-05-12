@@ -3,38 +3,52 @@
 /**
  * useDialogueSession — WebSocket lifecycle hook for the /originate page.
  *
- * Wave 1.A (F.1.A) — SKELETON implementation:
- *   - Establishes a WebSocket connection to /api/dialogue/stream (proxied
- *     through Next.js rewrites to the backend FastAPI router).
- *   - Sends the JWT-bearing handshake envelope on the first user input.
- *   - Buffers received events and surfaces them as a flat ``messages`` list
- *     with raw text rendering only.
- *   - Tracks coarse connection state + current DialoguePhase so the right-
- *     side status panel can render a phase chip and connection indicator.
- *   - Provides a single 30-second heartbeat ping while connected.
- *   - Translates the four application-private close codes (4429 / 4402 /
- *     4503 / 4410 / 4404) into user-friendly error strings.
+ * Wave 1.B (F.1.B) — structured-payload routing:
+ *   - Connection lifecycle + handshake (carried over from Wave 1.A).
+ *   - Messages now carry an optional ``structured_payloads`` array — when a
+ *     ``turn_complete`` event arrives with a non-null ``structured_payload``,
+ *     the hook attaches it to the in-flight assistant message so the
+ *     ``OriginateChat`` renders the matching card alongside the text.
+ *   - Per-agent payloads — if a future engine version attaches a
+ *     ``structured_payload`` on ``agent_response`` events, the hook appends
+ *     each as its own message (one card per agent).  Today, the engine
+ *     emits only ``{ event, agent_id, text }`` on ``agent_response``; the
+ *     hook tolerates the field's absence.
+ *   - Phase translation — the engine emits ``DialoguePhase`` as lowercase
+ *     wire values (``"entry"``, ``"validation"``).  The hook normalises to
+ *     the UPPERCASE TypeScript variant used by existing UI components.
+ *   - Light-backtest snapshot updates from DoctorAlertPayload-style events
+ *     (``failure_mode_materialized`` triggers + emerging metrics) feed the
+ *     existing ``lightBacktest`` setter.
  *
- * F.1.B will add: structured-payload routing (Screen1/2/3 dispatch),
- * light-backtest snapshot updates, phase-advance offer surfacing, and
- * per-event component rendering.
+ * F.1.C will add: Accept-Strategy mutation wiring, light-backtest fingerprint
+ * detection, and phase-advance-offer surfacing.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAccessToken } from '@/lib/api';
+import {
+  tagPayload,
+} from '@/components/originate/payloads/discriminate';
+import type {
+  DialoguePhase,
+  LightBacktestStatus,
+  LightBacktestVerdict,
+  RawStructuredPayload,
+  TaggedStructuredPayload,
+} from '@/types/originate';
+
+// Re-export the public type aliases so call sites that imported them from
+// this hook in Wave 1.A keep working without changing imports.
+export type {
+  DialoguePhase,
+  LightBacktestStatus,
+  LightBacktestVerdict,
+} from '@/types/originate';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type DialoguePhase =
-  | 'ENTRY'
-  | 'EXTRACTION'
-  | 'EXPLORATION'
-  | 'REFINEMENT'
-  | 'VALIDATION'
-  | 'DEPLOYMENT_DECISION'
-  | 'ACCOMPANIMENT';
 
 export type ConnectionState =
   | 'idle'
@@ -44,15 +58,14 @@ export type ConnectionState =
   | 'reconnecting'
   | 'error';
 
-export type LightBacktestStatus =
-  | 'NOT_STARTED'
-  | 'IN_FLIGHT'
-  | 'COMPLETE'
-  | 'FAILED';
-
 export interface LightBacktestSnapshot {
   status: LightBacktestStatus;
-  // F.1.B will add: metrics, verdict, fingerprint, etc.
+  /** Optional verdict once the backtest completes. */
+  verdict?: LightBacktestVerdict;
+  /** Headline Sharpe surfaced from Screen3Payload.metrics.sharpe (when present). */
+  sharpe?: number | null;
+  /** Optional human-readable failure reason. */
+  failureReason?: string;
 }
 
 /** A single chat-style message rendered in the transcript. */
@@ -61,12 +74,14 @@ export interface DialogueMessage {
   id: string;
   /** Sender bucket: the user, an agent, or the system (connection events / errors). */
   role: 'user' | 'agent' | 'system';
-  /** Free-form text. For Wave 1.A this is the body of every event. */
+  /** Free-form text. */
   text: string;
   /** Optional agent identifier (e.g. ``co_author``) when ``role === 'agent'``. */
   agentId?: string;
   /** Local timestamp for ordering / display. */
   createdAt: number;
+  /** Optional structured payloads attached to this message — rendered as cards below the text. */
+  structured_payloads?: TaggedStructuredPayload[];
 }
 
 /** First-message envelope on the WebSocket per backend handshake schema. */
@@ -78,16 +93,22 @@ interface DialogueHandshake {
 
 /** Discriminated union over the streaming event types the backend emits. */
 type DialogueEvent =
-  | { event: 'turn_started'; session_id: string; current_phase: DialoguePhase }
+  | { event: 'turn_started'; session_id: string; current_phase: string }
   | { event: 'agent_dispatched'; agent_ids: string[] }
-  | { event: 'agent_response'; agent_id: string; text: string }
+  | {
+      event: 'agent_response';
+      agent_id: string;
+      text: string;
+      /** Reserved — future engine versions may attach per-agent payloads. */
+      structured_payload?: RawStructuredPayload | null;
+    }
   | {
       event: 'turn_complete';
       session_id: string;
       output_text: string;
-      current_phase: DialoguePhase;
+      current_phase: string;
       turn_count: number;
-      structured_payload: Record<string, unknown> | null;
+      structured_payload: RawStructuredPayload | null;
       phase_advance_offer: Record<string, unknown> | null;
     }
   | { event: 'error'; detail: string };
@@ -102,6 +123,29 @@ export interface UseDialogueSessionReturn {
   errorDetail: string | null;
   /** Send a user message. Opens the socket on first send if needed. */
   sendUserInput: (input: string) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Wire-value → TypeScript-enum translation
+// ---------------------------------------------------------------------------
+
+const PHASE_WIRE_TO_TS: Record<string, DialoguePhase> = {
+  entry: 'ENTRY',
+  extraction: 'EXTRACTION',
+  exploration: 'EXPLORATION',
+  refinement: 'REFINEMENT',
+  validation: 'VALIDATION',
+  deployment_decision: 'DEPLOYMENT_DECISION',
+  accompaniment: 'ACCOMPANIMENT',
+};
+
+function normalisePhase(wire: string | null | undefined): DialoguePhase | null {
+  if (!wire) return null;
+  // Tolerate already-uppercase inputs (e.g. test stubs / future contracts).
+  if (Object.values(PHASE_WIRE_TO_TS).includes(wire as DialoguePhase)) {
+    return wire as DialoguePhase;
+  }
+  return PHASE_WIRE_TO_TS[wire.toLowerCase()] ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,10 +196,6 @@ function makeMessageId(): string {
 export function useDialogueSession(): UseDialogueSessionReturn {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [phase, setPhase] = useState<DialoguePhase | null>(null);
-  // Wave 1.A: setter is reserved for F.1.B (when light-backtest progress
-  // events start updating the snapshot). For now the state holds the
-  // initial NOT_STARTED sentinel so the right-side panel renders.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lightBacktest, setLightBacktest] = useState<LightBacktestSnapshot>({
     status: 'NOT_STARTED',
   });
@@ -168,13 +208,89 @@ export function useDialogueSession(): UseDialogueSessionReturn {
   const reconnectAttemptsRef = useRef<number>(0);
   const pendingInputRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  /** Tracks the id of the most-recent agent message so per-agent
+   *  payload events can attach to it without creating a phantom row. */
+  const lastAgentMessageIdRef = useRef<string | null>(null);
 
-  const appendMessage = useCallback((msg: Omit<DialogueMessage, 'id' | 'createdAt'>) => {
-    setMessages((prev) => [
-      ...prev,
-      { id: makeMessageId(), createdAt: Date.now(), ...msg },
-    ]);
-  }, []);
+  const appendMessage = useCallback(
+    (msg: Omit<DialogueMessage, 'id' | 'createdAt'>) => {
+      const id = makeMessageId();
+      setMessages((prev) => [
+        ...prev,
+        { id, createdAt: Date.now(), ...msg },
+      ]);
+      if (msg.role === 'agent') {
+        lastAgentMessageIdRef.current = id;
+      }
+      return id;
+    },
+    [],
+  );
+
+  /** Attach a structured payload to the most-recent agent message, or
+   *  emit a fresh placeholder agent message when none exists yet.  Used
+   *  by `agent_response` events that carry a per-agent payload. */
+  const attachPayloadToLastAgent = useCallback(
+    (payload: TaggedStructuredPayload, agentId?: string) => {
+      const lastId = lastAgentMessageIdRef.current;
+      if (!lastId) {
+        // No agent message in flight — attach to a fresh placeholder so
+        // the card still renders.
+        const id = makeMessageId();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id,
+            createdAt: Date.now(),
+            role: 'agent',
+            text: '',
+            agentId,
+            structured_payloads: [payload],
+          },
+        ]);
+        lastAgentMessageIdRef.current = id;
+        return;
+      }
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== lastId) return m;
+          return {
+            ...m,
+            structured_payloads: [...(m.structured_payloads ?? []), payload],
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  /** Fold a tagged payload into the light-backtest snapshot when it
+   *  carries lifecycle info (Screen3 verdict + metrics; DoctorAlert
+   *  failure_mode_materialized → FAILED transition). */
+  const foldPayloadIntoBacktest = useCallback(
+    (payload: TaggedStructuredPayload) => {
+      if (payload.kind === 'screen3') {
+        const sharpe = payload.metrics.sharpe;
+        setLightBacktest({
+          status: 'COMPLETE',
+          verdict: payload.verdict,
+          sharpe: sharpe ?? null,
+        });
+        return;
+      }
+      if (payload.kind === 'doctor_alert') {
+        // A Doctor alert tagged `failure_mode_materialized` is the
+        // engine's "light backtest failed" surrogate per F.1.B spec.
+        if (payload.trigger === 'failure_mode_materialized') {
+          setLightBacktest({
+            status: 'FAILED',
+            failureReason: payload.message ?? 'Failure mode materialised.',
+          });
+        }
+      }
+    },
+    [],
+  );
 
   const stopHeartbeat = useCallback(() => {
     if (heartbeatRef.current) {
@@ -183,18 +299,21 @@ export function useDialogueSession(): UseDialogueSessionReturn {
     }
   }, []);
 
-  const startHeartbeat = useCallback((ws: WebSocket) => {
-    stopHeartbeat();
-    heartbeatRef.current = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try {
-          ws.send(JSON.stringify({ event: 'ping' }));
-        } catch {
-          // Best-effort; if the send fails the close handler will fire shortly.
+  const startHeartbeat = useCallback(
+    (ws: WebSocket) => {
+      stopHeartbeat();
+      heartbeatRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify({ event: 'ping' }));
+          } catch {
+            // Best-effort; if the send fails the close handler will fire shortly.
+          }
         }
-      }
-    }, HEARTBEAT_INTERVAL_MS);
-  }, [stopHeartbeat]);
+      }, HEARTBEAT_INTERVAL_MS);
+    },
+    [stopHeartbeat],
+  );
 
   const handleEvent = useCallback(
     (raw: string) => {
@@ -202,47 +321,110 @@ export function useDialogueSession(): UseDialogueSessionReturn {
       try {
         evt = JSON.parse(raw) as DialogueEvent;
       } catch {
-        // Backend always emits JSON; a parse failure is unrecoverable.
-        appendMessage({ role: 'system', text: 'Received a malformed event from the dialogue stream.' });
+        appendMessage({
+          role: 'system',
+          text: 'Received a malformed event from the dialogue stream.',
+        });
         return;
       }
 
       switch (evt.event) {
-        case 'turn_started':
+        case 'turn_started': {
           sessionIdRef.current = evt.session_id;
           setSessionId(evt.session_id);
-          setPhase(evt.current_phase);
+          const ph = normalisePhase(evt.current_phase);
+          if (ph) setPhase(ph);
+          // Reset the per-turn light-backtest in-flight indicator when
+          // a fresh turn begins so the right-side panel reflects the
+          // session's new state.  Only flip if we're currently
+          // NOT_STARTED — established results carry through.
+          setLightBacktest((prev) => {
+            if (
+              prev.status === 'COMPLETE' ||
+              prev.status === 'FAILED' ||
+              prev.status === 'IN_FLIGHT'
+            ) {
+              return prev;
+            }
+            return prev;
+          });
           break;
+        }
         case 'agent_dispatched':
-          // Wave 1.A: surface as a lightweight system note so the user sees activity.
           appendMessage({
             role: 'system',
             text: `Dispatching agents: ${evt.agent_ids.join(', ')}`,
           });
-          break;
-        case 'agent_response':
-          appendMessage({
-            role: 'agent',
-            text: evt.text,
-            agentId: evt.agent_id,
-          });
-          break;
-        case 'turn_complete':
-          setPhase(evt.current_phase);
-          // Wave 1.A: render the final output_text as a plain agent message.
-          // F.1.B will instead route structured_payload through dedicated
-          // Screen1/2/3 renderers and surface phase_advance_offer as a CTA.
-          if (evt.output_text) {
-            appendMessage({ role: 'agent', text: evt.output_text });
+          // If the VALIDATION-phase reviewers (cross_examiner +
+          // pre_mortem_guide) are being dispatched, the engine is
+          // about to fire a light backtest — mark IN_FLIGHT so the
+          // status panel shows the spinner.
+          if (
+            evt.agent_ids.includes('cross_examiner') ||
+            evt.agent_ids.includes('pre_mortem_guide')
+          ) {
+            setLightBacktest((prev) =>
+              prev.status === 'COMPLETE' || prev.status === 'FAILED'
+                ? prev
+                : { status: 'IN_FLIGHT' },
+            );
           }
           break;
+        case 'agent_response': {
+          const msgId = makeMessageId();
+          // Per-agent payload — tagged if present.
+          const tagged = evt.structured_payload
+            ? tagPayload(evt.structured_payload)
+            : null;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: msgId,
+              createdAt: Date.now(),
+              role: 'agent',
+              text: evt.text,
+              agentId: evt.agent_id,
+              structured_payloads: tagged ? [tagged] : undefined,
+            },
+          ]);
+          lastAgentMessageIdRef.current = msgId;
+          if (tagged) foldPayloadIntoBacktest(tagged);
+          break;
+        }
+        case 'turn_complete': {
+          const ph = normalisePhase(evt.current_phase);
+          if (ph) setPhase(ph);
+          const tagged = evt.structured_payload
+            ? tagPayload(evt.structured_payload)
+            : null;
+
+          if (evt.output_text) {
+            const msgId = makeMessageId();
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: msgId,
+                createdAt: Date.now(),
+                role: 'agent',
+                text: evt.output_text,
+                structured_payloads: tagged ? [tagged] : undefined,
+              },
+            ]);
+            lastAgentMessageIdRef.current = msgId;
+          } else if (tagged) {
+            // No text but a payload — render the card on its own.
+            attachPayloadToLastAgent(tagged);
+          }
+          if (tagged) foldPayloadIntoBacktest(tagged);
+          break;
+        }
         case 'error':
           setErrorDetail(evt.detail);
           appendMessage({ role: 'system', text: `Error: ${evt.detail}` });
           break;
       }
     },
-    [appendMessage],
+    [appendMessage, attachPayloadToLastAgent, foldPayloadIntoBacktest],
   );
 
   const openSocket = useCallback(
@@ -257,7 +439,9 @@ export function useDialogueSession(): UseDialogueSessionReturn {
       const url = buildWsUrl();
       if (!url) return;
 
-      setConnectionState((prev) => (prev === 'reconnecting' ? 'reconnecting' : 'connecting'));
+      setConnectionState((prev) =>
+        prev === 'reconnecting' ? 'reconnecting' : 'connecting',
+      );
       setErrorDetail(null);
 
       const ws = new WebSocket(url);
