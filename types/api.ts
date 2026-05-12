@@ -434,13 +434,39 @@ export interface UserProfile {
   target_annual_return_pct: number | null;
 }
 
-/** GET /api/user/alpaca/status */
+/**
+ * GET /api/user/alpaca/status
+ *
+ * Phase Q Wave 1 E.4.B — paper and live credentials are stored independently.
+ * `paper_connected`, `paper_account_id`, `live_connected`, and `live_account_id`
+ * are the authoritative fields the UI should read.
+ *
+ * The legacy `connected` / `account_id` / `is_paper` fields are populated for
+ * backward compatibility with the pre-E.4.B frontend (sunsets one release after
+ * F.4 lands); they mirror the paper-mode pair when paper is connected, otherwise
+ * the live-mode pair.  New code SHOULD NOT consume these — use the mode-keyed
+ * fields below.
+ */
 export interface AlpacaConnectionStatus {
+  /** @deprecated use `paper_connected` / `live_connected`. Removed after F.4 sunset. */
   connected: boolean;
+  /** @deprecated use `paper_account_id` / `live_account_id`. Removed after F.4 sunset. */
   account_id: string | null;
+  /** @deprecated infer from `paper_connected` vs `live_connected`. Removed after F.4 sunset. */
   is_paper: boolean;
   status_message: string;
+  /** True when the user has a paper-mode Alpaca credential row stored. */
+  paper_connected: boolean;
+  /** Paper-mode Alpaca account ID, or null when paper is not connected. */
+  paper_account_id: string | null;
+  /** True when the user has a live-mode Alpaca credential row stored. */
+  live_connected: boolean;
+  /** Live-mode Alpaca account ID, or null when live is not connected. */
+  live_account_id: string | null;
 }
+
+/** Selects which Alpaca credential row a connect/disconnect request targets. */
+export type AlpacaMode = 'paper' | 'live';
 
 // ---------------------------------------------------------------------------
 // Fleet analytics — benchmark

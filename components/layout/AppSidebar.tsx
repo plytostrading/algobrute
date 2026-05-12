@@ -64,8 +64,14 @@ export default function AppSidebar() {
   const queryClient = useQueryClient();
   const initials = profile ? getInitials(profile.email) : '…';
   const displayName = profile ? getDisplayName(profile.email) : 'Loading…';
+  // Beta is paper-only, so the sidebar indicator reflects paper-mode connection
+  // (the only mode that gates trading today).  Post-E.4.B mode-aware fields are
+  // authoritative; the legacy `connected` flag is only relied on if those are
+  // missing from the response (older backends).
+  const paperConnected =
+    alpacaStatus?.paper_connected ?? alpacaStatus?.connected ?? false;
   const subtitle = profile
-    ? `${profile.expertise_level}${alpacaStatus?.connected ? ' · Alpaca ✓' : ''}`
+    ? `${profile.expertise_level}${paperConnected ? ' · Alpaca ✓' : ''}`
     : '…';
 
   const handleLogout = async () => {

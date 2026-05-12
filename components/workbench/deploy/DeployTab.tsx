@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useStrategies } from '@/hooks/useStrategies';
 import { useDeployBot } from '@/hooks/useBots';
+import { useAlpacaStatus } from '@/hooks/useAlpacaStatus';
 import { usePromoteToPassport, usePassportForJob } from '@/hooks/useBacktestWorkflow';
 import type { PassportPromotionResponse } from '@/types/api';
 import StrategyDNA from '@/components/portfolio/StrategyDNA';
@@ -232,7 +233,15 @@ export default function DeployTab({ selectedStrategyId, activeJobId }: DeployTab
   }, [passport]);
 
   const { data: strategies = [] } = useStrategies();
+  const { data: alpacaStatus } = useAlpacaStatus();
   const deployBot = useDeployBot();
+
+  // Beta is paper-only — every deployment routes through Alpaca paper.
+  // Post-E.4.B status reports paper and live independently; fall back to the
+  // legacy `connected` flag only when an older backend response is missing the
+  // mode-aware field.
+  const paperConnected =
+    alpacaStatus?.paper_connected ?? alpacaStatus?.connected ?? false;
 
   const handleLaunch = useCallback(() => {
     if (!strategyId || !passport?.passport_id) return;
@@ -246,7 +255,7 @@ export default function DeployTab({ selectedStrategyId, activeJobId }: DeployTab
   }, [strategyId, ticker, capitalPct, initialCapital, passport, deployBot]);
 
   const isReady = !!strategyId && !!ticker && Number(capitalPct) > 0 && Number(initialCapital) > 0;
-  const canLaunch = isReady && !!passport?.passport_id;
+  const canLaunch = isReady && !!passport?.passport_id && paperConnected;
   const deploymentNotApproved = passport !== undefined && !passport.deployment_approved;
 
   if (!activeJobId) return <NoBacktestGuide />;
@@ -337,6 +346,23 @@ export default function DeployTab({ selectedStrategyId, activeJobId }: DeployTab
           </div>
 
           <Separator />
+
+          {/* Alpaca paper not connected — beta deployments are paper-only */}
+          {!paperConnected && (
+            <div
+              className="flex items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning"
+              data-testid="deploy-paper-not-connected"
+            >
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Connect your Alpaca paper account in{' '}
+                <Link href="/settings" className="font-medium underline">
+                  Settings
+                </Link>{' '}
+                before deploying paper bots.
+              </span>
+            </div>
+          )}
 
           {/* Not-approved passport warning — shown above the launch button */}
           {deploymentNotApproved && (

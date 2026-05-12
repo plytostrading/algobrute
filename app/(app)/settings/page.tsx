@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Lock, FlaskConical } from 'lucide-react';
 import { apiFetch, parseApiError, parseApiJson } from '@/lib/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { formatCurrency } from '@/utils/formatters';
@@ -25,7 +27,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import type { UserProfile, AlpacaConnectionStatus } from '@/types/api';
+import type { UserProfile, AlpacaConnectionStatus, AlpacaMode } from '@/types/api';
 
 // ---------------------------------------------------------------------------
 // Fetchers
@@ -56,11 +58,22 @@ async function fetchAlpacaStatus(): Promise<AlpacaConnectionStatus> {
   return parseApiJson<AlpacaConnectionStatus>(res);
 }
 
-async function connectAlpaca(apiKey: string, secretKey: string): Promise<AlpacaConnectionStatus> {
+/**
+ * POST /api/user/alpaca/connect with mode-aware body.
+ *
+ * Phase Q Wave 1 E.4.B — paper and live credentials are stored
+ * independently.  Submitting paper credentials does not touch the live row,
+ * and vice versa.
+ */
+async function connectAlpaca(
+  apiKey: string,
+  secretKey: string,
+  mode: AlpacaMode,
+): Promise<AlpacaConnectionStatus> {
   const res = await apiFetch('/api/user/alpaca/connect', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_key: apiKey, secret_key: secretKey }),
+    body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, mode }),
   });
   if (!res.ok) {
     const detail = await parseApiError(res, 'Failed to connect Alpaca account');
@@ -198,28 +211,67 @@ function RiskProfileCard({ profile }: { profile: UserProfile }) {
   );
 }
 
-async function disconnectAlpaca(): Promise<void> {
-  const res = await apiFetch('/api/user/alpaca/disconnect', { method: 'DELETE' });
+/**
+ * DELETE /api/user/alpaca/disconnect with mode-aware body.
+ *
+ * Phase Q Wave 1 E.4.B — disconnecting one mode preserves the other.
+ */
+async function disconnectAlpaca(mode: AlpacaMode): Promise<void> {
+  const res = await apiFetch('/api/user/alpaca/disconnect', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  });
   if (!res.ok) {
     const detail = await parseApiError(res, 'Failed to disconnect Alpaca account');
     throw new Error(detail);
   }
 }
 
-function AlpacaCard() {
+// ---------------------------------------------------------------------------
+// AlpacaModePanel — one panel per mode (paper / live), used inside Tabs
+// ---------------------------------------------------------------------------
+
+interface AlpacaModePanelProps {
+  /** Which credential row this panel manages. */
+  mode: AlpacaMode;
+  /** True when this mode currently has credentials stored. */
+  connected: boolean;
+  /** Alpaca-side account ID for this mode, or null when not connected. */
+  accountId: string | null;
+  /**
+   * Hard-coded informational copy rendered above the form.  Trust-building
+   * moment — customers should understand exactly what they're storing for
+   * each mode before submitting credentials.
+   */
+  description: string;
+  /**
+   * Optional accent classes applied to the description banner.  Used to
+   * visually distinguish the deferred-live tab from the active paper tab.
+   */
+  descriptionClassName?: string;
+  /** Optional icon rendered alongside the description banner. */
+  icon?: React.ReactNode;
+}
+
+function AlpacaModePanel({
+  mode,
+  connected,
+  accountId,
+  description,
+  descriptionClassName,
+  icon,
+}: AlpacaModePanelProps) {
   const queryClient = useQueryClient();
   const [apiKey, setApiKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
 
-  const { data: status, isLoading } = useQuery({
-    queryKey: queryKeys.user.alpacaStatus,
-    queryFn: fetchAlpacaStatus,
-  });
+  const modeLabel = mode === 'paper' ? 'Paper' : 'Live';
 
   const connectMutation = useMutation({
-    mutationFn: () => connectAlpaca(apiKey, secretKey),
+    mutationFn: () => connectAlpaca(apiKey, secretKey, mode),
     onSuccess: () => {
-      toast.success('Alpaca connected successfully');
+      toast.success(`Alpaca ${modeLabel.toLowerCase()} credentials saved`);
       setApiKey('');
       setSecretKey('');
       void queryClient.invalidateQueries({ queryKey: queryKeys.user.alpacaStatus });
@@ -228,79 +280,193 @@ function AlpacaCard() {
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: disconnectAlpaca,
+    mutationFn: () => disconnectAlpaca(mode),
     onSuccess: () => {
-      toast.success('Alpaca disconnected');
+      toast.success(`Alpaca ${modeLabel.toLowerCase()} credentials removed`);
       void queryClient.invalidateQueries({ queryKey: queryKeys.user.alpacaStatus });
     },
-    onError: (err: Error) => toast.error(`Disconnect failed: ${err.message}`),
+    onError: (err: Error) =>
+      toast.error(`Disconnect failed: ${err.message}`),
+  });
+
+  return (
+    <div className="space-y-4" data-testid={`alpaca-panel-${mode}`}>
+      <div
+        className={`flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground ${descriptionClassName ?? ''}`}
+      >
+        {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
+        <p>{description}</p>
+      </div>
+
+      {connected ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-green-600 text-white" data-testid={`alpaca-status-${mode}`}>
+              Connected
+            </Badge>
+            {accountId && (
+              <span className="text-sm text-muted-foreground font-mono-data">
+                Account: {accountId}
+              </span>
+            )}
+          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={disconnectMutation.isPending}
+                data-testid={`alpaca-disconnect-${mode}`}
+              >
+                {disconnectMutation.isPending ? 'Disconnecting…' : 'Disconnect'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Disconnect Alpaca {modeLabel.toLowerCase()} credentials?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove your {modeLabel.toLowerCase()}-mode Alpaca API
+                  credentials. Your {mode === 'paper' ? 'live' : 'paper'}-mode
+                  credentials will be left intact. Any running{' '}
+                  {modeLabel.toLowerCase()} bots may lose their brokerage
+                  connection. You can reconnect at any time.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-white hover:bg-destructive/90"
+                  onClick={() => disconnectMutation.mutate()}
+                >
+                  Disconnect
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid gap-2">
+            <Label htmlFor={`alpaca-api-key-${mode}`}>API Key</Label>
+            <Input
+              id={`alpaca-api-key-${mode}`}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={mode === 'paper' ? 'PKTEST…' : 'AK…'}
+              data-testid={`alpaca-api-key-${mode}`}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`alpaca-secret-key-${mode}`}>Secret Key</Label>
+            <Input
+              id={`alpaca-secret-key-${mode}`}
+              type="password"
+              value={secretKey}
+              onChange={(e) => setSecretKey(e.target.value)}
+              placeholder="••••••••"
+              data-testid={`alpaca-secret-key-${mode}`}
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={() => connectMutation.mutate()}
+            disabled={connectMutation.isPending || !apiKey || !secretKey}
+            data-testid={`alpaca-connect-${mode}`}
+          >
+            {connectMutation.isPending
+              ? 'Connecting…'
+              : mode === 'paper'
+                ? 'Connect Paper Account'
+                : 'Save Live Credentials'}
+          </Button>
+          {connectMutation.isError && (
+            <p
+              className="text-sm text-destructive"
+              data-testid={`alpaca-error-${mode}`}
+            >
+              {(connectMutation.error as Error).message}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlpacaCard() {
+  const { data: status, isLoading } = useQuery({
+    queryKey: queryKeys.user.alpacaStatus,
+    queryFn: fetchAlpacaStatus,
   });
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Alpaca Connection</CardTitle>
-        <CardDescription>Connect your personal Alpaca brokerage account</CardDescription>
+        <CardDescription>
+          Connect your personal Alpaca brokerage account. Paper and live
+          credentials are stored independently.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isLoading || !status ? (
           <ProfileSkeleton />
-        ) : status?.connected ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Badge className="bg-green-600 text-white">Connected</Badge>
-              {status.account_id && (
-                <span className="text-sm text-muted-foreground">Account: {status.account_id}</span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">{status.status_message}</p>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={disconnectMutation.isPending}
-                >
-                  {disconnectMutation.isPending ? 'Disconnecting…' : 'Disconnect'}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Disconnect Alpaca account?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will remove your Alpaca API credentials. Any running bots may lose their
-                    brokerage connection. You can reconnect at any time.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-white hover:bg-destructive/90"
-                    onClick={() => disconnectMutation.mutate()}
-                  >
-                    Disconnect
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
         ) : (
-          <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label>API Key</Label>
-              <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="PKTEST…" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Secret Key</Label>
-              <Input type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="••••••••" />
-            </div>
-            <Button size="sm" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending || !apiKey || !secretKey}>
-              {connectMutation.isPending ? 'Connecting…' : 'Connect'}
-            </Button>
-            {connectMutation.isError && (
-              <p className="text-sm text-destructive">{(connectMutation.error as Error).message}</p>
-            )}
-          </div>
+          <Tabs defaultValue="paper" className="w-full">
+            <TabsList className="w-full">
+              <TabsTrigger
+                value="paper"
+                className="flex-1 gap-2"
+                data-testid="alpaca-tab-paper"
+              >
+                <FlaskConical className="h-3.5 w-3.5" />
+                Paper
+                {status.paper_connected && (
+                  <span
+                    className="ml-1 h-2 w-2 rounded-full bg-green-500"
+                    aria-label="Paper connected"
+                  />
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="live"
+                className="flex-1 gap-2"
+                data-testid="alpaca-tab-live"
+              >
+                <Lock className="h-3.5 w-3.5 text-amber-500" />
+                Live
+                {status.live_connected && (
+                  <span
+                    className="ml-1 h-2 w-2 rounded-full bg-green-500"
+                    aria-label="Live credentials stored"
+                  />
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="paper" className="mt-4">
+              <AlpacaModePanel
+                mode="paper"
+                connected={status.paper_connected}
+                accountId={status.paper_account_id}
+                description="Paper trading credentials connect to Alpaca's paper sandbox. Trades are simulated; no real capital is at risk."
+                icon={<FlaskConical className="h-4 w-4 text-muted-foreground" />}
+              />
+            </TabsContent>
+
+            <TabsContent value="live" className="mt-4">
+              <AlpacaModePanel
+                mode="live"
+                connected={status.live_connected}
+                accountId={status.live_account_id}
+                description="Live trading is currently disabled during closed beta. You can connect your live keys here for future activation, but no live orders will be placed until the platform enables live trading."
+                descriptionClassName="border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300"
+                icon={<Lock className="h-4 w-4 text-amber-500" />}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </CardContent>
     </Card>
