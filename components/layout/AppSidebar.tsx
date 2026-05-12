@@ -16,6 +16,7 @@ import {
   Settings,
   ChevronUp,
   Activity,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -42,6 +43,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 const mainNav = [
   { icon: Briefcase, label: 'Portfolio', path: '/portfolio' },
   { icon: LayoutDashboard, label: 'Command Center', path: '/' },
+  { icon: Sparkles, label: 'Originate', path: '/originate' },
   { icon: FlaskConical, label: 'Workbench', path: '/workbench' },
   { icon: Radio, label: 'Operations', path: '/operations' },
   { icon: LineChart, label: 'Insights', path: '/insights' },

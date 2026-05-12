@@ -28,6 +28,7 @@ import { getInitials } from '@/lib/user';
 
 const pageTitles: Record<string, string> = {
   '/': 'Command Center',
+  '/originate': 'Originate',
   '/workbench': 'Workbench',
   '/operations': 'Operations',
   '/insights': 'Insights',
