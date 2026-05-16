@@ -1,8 +1,18 @@
 import type { NextConfig } from "next";
 
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:4001";
+// Backend API base URL. `NEXT_PUBLIC_API_URL` is preferred (set in Cloud Run);
+// `BACKEND_URL` is the legacy local-dev default. Cloud Run deploy points this
+// at the engine VM, e.g. http://34.121.58.22:8000.
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  process.env.BACKEND_URL ??
+  "http://localhost:4001";
 
 const nextConfig: NextConfig = {
+  // Standalone output: produces a self-contained .next/standalone tree
+  // that can be copied into a slim Cloud Run container (see Dockerfile).
+  output: "standalone",
+
   async rewrites() {
     return [
       {
