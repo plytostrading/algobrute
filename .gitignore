@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Layer 3 persona screenshot output (not committed; re-generated per run)
 e2e-screenshots/
+
+# Design handoff bundles from Claude Design (per project_v3_ui_redesign_anchor)
+_design/v3-bundle*/
