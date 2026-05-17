@@ -16,6 +16,7 @@ import {
   Settings,
   ChevronUp,
   Activity,
+  Shield,
   Sparkles,
 } from 'lucide-react';
 import {
@@ -46,6 +47,7 @@ const mainNav = [
   { icon: Sparkles, label: 'Originate', path: '/originate' },
   { icon: FlaskConical, label: 'Workbench', path: '/workbench' },
   { icon: Radio, label: 'Operations', path: '/operations' },
+  { icon: Shield, label: 'Fleet Journey', path: '/fleet-journey' },
   { icon: LineChart, label: 'Insights', path: '/insights' },
 ];
 

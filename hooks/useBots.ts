@@ -21,6 +21,10 @@ function invalidateAfterBotMutation(queryClient: ReturnType<typeof useQueryClien
   void queryClient.invalidateQueries({ queryKey: queryKeys.bots.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.fleet.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.monitoring.all });
+  // Bot mutations (deploy / pause / resume / retire) change the
+  // bot_state surfaced on the per-strategy lifecycle envelope so the
+  // F.2 timeline view re-fetches after the mutation lands.
+  void queryClient.invalidateQueries({ queryKey: queryKeys.origination.all });
 }
 
 /**
