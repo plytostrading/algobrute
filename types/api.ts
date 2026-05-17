@@ -1624,3 +1624,58 @@ export interface AlreadyPromotedResponse {
   deep_job_id: string;
   detail: string;
 }
+
+// ---------------------------------------------------------------------------
+// Notification inbox (task #364) — mirrors the backend
+// `NotificationItem` / `NotificationListResponse` Pydantic shapes from
+// `algobrute.api.schemas`.  Surfaces persisted in-app qualification
+// notifications written by the Lane 3C dispatcher.
+// ---------------------------------------------------------------------------
+
+export type NotificationSeverity = 'success' | 'warning' | 'info';
+export type NotificationTransition = 'upgrade' | 'decay' | 'initial';
+
+/**
+ * One persisted in-app notification (one row of
+ * `qualification_notifications`).
+ *
+ * `id` is the durable primary key the mark-read endpoint expects.
+ * `event_id` is the source-event UUID (idempotency key on the dispatcher).
+ * `read_at` is `null` until the user opens the bell or clicks the row.
+ * `action_url` is the optional deep-link the dropdown navigates to on click.
+ */
+export interface NotificationItem {
+  id: string;
+  event_id: string;
+  bot_id: string;
+  subject: string;
+  body: string;
+  action_label: string | null;
+  action_url: string | null;
+  severity: NotificationSeverity;
+  transition: NotificationTransition;
+  /** ISO 8601 datetime — wire-format from the backend. */
+  created_at: string;
+  /** ISO 8601 datetime, or null until the user has read the row. */
+  read_at: string | null;
+}
+
+/** GET /api/notifications response. */
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  /** Unread-count rollup over the full inbox (filter-independent). */
+  unread_count: number;
+  /** Total notifications in the user's inbox (filter-independent). */
+  total: number;
+}
+
+/** GET /api/notifications/unread-count response. */
+export interface NotificationUnreadCountResponse {
+  unread_count: number;
+}
+
+/** POST /api/notifications/{id}/read and /read-all response. */
+export interface NotificationMarkReadResponse {
+  /** Number of rows actually flipped to read by this call (0 if idempotent no-op). */
+  marked_read: number;
+}

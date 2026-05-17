@@ -1,9 +1,8 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Moon, Sun, Search } from 'lucide-react';
+import { Moon, Sun, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -19,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useFleetRecommendations } from '@/hooks/useFleetRecommendations';
+import NotificationsBell from '@/components/layout/NotificationsBell';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/store/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,14 +38,10 @@ export default function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [colorMode, setColorMode] = useColorMode();
-  const { data: recommendations } = useFleetRecommendations();
   const { data: profile } = useUserProfile();
   const { logout } = useAuth();
   const queryClient = useQueryClient();
   const initials = profile ? getInitials(profile.email) : '…';
-
-  // Alert count: high-priority recommendations
-  const totalAlerts = (recommendations ?? []).filter((r) => r.priority === 'high').length;
 
   const pageTitle = pageTitles[pathname] || 'AlgoBrute';
 
@@ -75,23 +70,8 @@ export default function AppHeader() {
 
         <Separator orientation="vertical" className="mx-2 hidden h-4 md:block" />
 
-        {/* Notifications */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-8 w-8">
-              <Bell className="h-4 w-4" />
-              {totalAlerts > 0 && (
-                <Badge
-                  variant="destructive"
-                  className="absolute -right-1 -top-1 h-4 min-w-4 px-1 text-[10px] leading-none"
-                >
-                  {totalAlerts}
-                </Badge>
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Notifications</TooltipContent>
-        </Tooltip>
+        {/* Notifications — task #364: real customer inbox bell + dropdown */}
+        <NotificationsBell />
 
         {/* Theme toggle */}
         <Tooltip>

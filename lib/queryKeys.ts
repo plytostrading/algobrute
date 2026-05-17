@@ -51,6 +51,12 @@ export const queryKeys = {
     report: (botId: string | null | undefined) =>
       ['monitoring', 'report', botId] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    list: (unreadOnly: boolean = false) =>
+      ['notifications', 'list', { unreadOnly }] as const,
+    unreadCount: ['notifications', 'unread-count'] as const,
+  },
   strategies: {
     all: ['strategies'] as const,
     detail: (strategyId: string | null | undefined) =>
