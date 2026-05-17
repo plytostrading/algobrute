@@ -249,6 +249,67 @@ async function stubLifecycle(page: Page, payload: LifecycleStub) {
   );
 }
 
+/**
+ * Helper — register a GET monitoring-report stub for the canonical
+ * bot id.  The strategy-detail page fetches this only when the live
+ * stage has closed-trade evidence (task #365).
+ */
+async function stubMonitoringReport(
+  page: Page,
+  overrides: Partial<MonitoringReportStub> = {},
+) {
+  const payload: MonitoringReportStub = {
+    bot_id: BOT_ID,
+    timestamp: '2026-05-10T15:00:00Z',
+    sprt_win_rate_decision: 'reject_h0',
+    sprt_win_rate_n_obs: 40,
+    sprt_win_rate_llr: 3.1,
+    sprt_payoff_decision: 'continue',
+    sprt_payoff_n_obs: 40,
+    sprt_payoff_llr: 0.4,
+    cusum_status: 'stable',
+    cusum_sum: 0.12,
+    win_rate_posterior_mean: 0.58,
+    win_rate_posterior_ci_lower: 0.51,
+    win_rate_posterior_ci_upper: 0.65,
+    pnl_posterior_mean: 64.1,
+    pnl_posterior_ci_lower: 12.0,
+    pnl_posterior_ci_upper: 116.2,
+    alerts: [],
+    passport_id: PASSPORT_ID,
+    passport_version: 1,
+    ...overrides,
+  };
+  await page.route(
+    `**/api/monitoring/bots/${BOT_ID}/report`,
+    async (route) => {
+      await fulfillJson(route, payload);
+    },
+  );
+}
+
+interface MonitoringReportStub {
+  bot_id: string;
+  timestamp: string;
+  sprt_win_rate_decision: string;
+  sprt_win_rate_n_obs: number;
+  sprt_win_rate_llr: number;
+  sprt_payoff_decision: string;
+  sprt_payoff_n_obs: number;
+  sprt_payoff_llr: number;
+  cusum_status: string;
+  cusum_sum: number;
+  win_rate_posterior_mean: number;
+  win_rate_posterior_ci_lower: number;
+  win_rate_posterior_ci_upper: number;
+  pnl_posterior_mean: number;
+  pnl_posterior_ci_lower: number;
+  pnl_posterior_ci_upper: number;
+  alerts: string[];
+  passport_id: string | null;
+  passport_version: number | null;
+}
+
 test.describe('/strategy/[passport_id] — F.2 timeline smokes', () => {
   test('renders the timeline with auth and origination + light-backtest stages always populated', async ({
     page,
@@ -377,6 +438,7 @@ test.describe('/strategy/[passport_id] — F.2 timeline smokes', () => {
   test('live-active state surfaces total P&L + closed-trade counts', async ({ page }) => {
     await withAuth(page);
     await stubLifecycle(page, withLiveActive(withDeepApproved(baseLifecycle())));
+    await stubMonitoringReport(page);
     await page.goto(`/strategy/${PASSPORT_ID}`);
 
     await expect(page.getByTestId('stage-live-operation')).toHaveAttribute(
@@ -391,6 +453,30 @@ test.describe('/strategy/[passport_id] — F.2 timeline smokes', () => {
       'href',
       `/operations?bot=${BOT_ID}`,
     );
+
+    // Task #365 — behavioral monitoring section appears under the
+    // active P&L block with plain-language SPRT/CUSUM/Bayesian
+    // verdicts sourced from the monitoring-report endpoint.
+    const monitoring = page.getByTestId('live-monitoring-section');
+    await expect(monitoring).toBeVisible();
+    await expect(monitoring).toContainText('Live behavior');
+    await expect(monitoring).toContainText('SPRT Win Rate');
+    await expect(monitoring).toContainText('Skill confirmed');
+    await expect(monitoring).toContainText('Performance stable');
+    await expect(monitoring).toContainText('58.0%');
+  });
+
+  test('live-ramping state does not render the monitoring section', async ({
+    page,
+  }) => {
+    await withAuth(page);
+    await stubLifecycle(page, withDeployed(withDeepApproved(baseLifecycle())));
+    // No monitoring stub — if the hook fires we want the test to fail
+    // loudly via an unhandled fetch rather than passing silently.
+    await page.goto(`/strategy/${PASSPORT_ID}`);
+
+    await expect(page.getByTestId('live-state-ramping')).toBeVisible();
+    await expect(page.getByTestId('live-monitoring-section')).toHaveCount(0);
   });
 
   test('Run Deep Validation CTA POSTs to /promote-to-deep endpoint', async ({ page }) => {

@@ -20,11 +20,26 @@
  * ``0.0`` (closed trades that net to zero) renders neutrally rather
  * than green/red — the colour conveys "did the bot make or lose
  * money", and exactly-zero is neither.
+ *
+ * Behavioral monitoring (task #365):
+ *   When the variant is ``active`` — i.e., the bot has produced at
+ *   least one closed trade — a "Live behavior" section appears
+ *   beneath the P&L block.  It reuses the operations-route
+ *   :file:`MonitoringPanel` component to surface SPRT, CUSUM, and
+ *   Bayesian indicators in plain language, sourced from
+ *   :func:`useMonitoringReport`.  The hook is gated by
+ *   ``enabled: !!botId``, so no request is made for ``no_bot`` /
+ *   ``ramping`` / ``stopped`` variants.  The intent is that a
+ *   customer viewing a single strategy's lifecycle never needs to
+ *   bounce to the Operations route just to learn what the platform
+ *   thinks of its live behavior.
  */
 
 import Link from 'next/link';
 import { Activity, ExternalLink, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import StageCard, { type StageStatus } from './StageCard';
+import MonitoringPanel from '@/components/operations/MonitoringPanel';
+import { useMonitoringReport } from '@/hooks/useMonitoringReport';
 import { cn } from '@/lib/utils';
 import type { StrategyLifecycleView } from '@/types/api';
 
@@ -105,6 +120,15 @@ export default function LiveOperationStageCard({ view }: LiveOperationStageCardP
   const tone = pnlTone(view.live_total_pnl_usd);
   const ToneIcon =
     tone === 'positive' ? TrendingUp : tone === 'negative' ? TrendingDown : Minus;
+
+  // Behavioral monitoring is meaningful only once the bot has produced
+  // closed-trade evidence — SPRT/CUSUM/Bayesian indicators have no
+  // input before the first close.  The hook short-circuits when bot_id
+  // is null/undefined; we additionally gate by variant so no fetch is
+  // issued for ramping/stopped bots either.
+  const monitoringBotId = state.variant === 'active' ? view.bot_id : null;
+  const { data: monitoringReport, isLoading: monitoringLoading } =
+    useMonitoringReport(monitoringBotId);
 
   return (
     <StageCard
@@ -208,6 +232,28 @@ export default function LiveOperationStageCard({ view }: LiveOperationStageCardP
               </span>
               <p className="text-xs mt-0.5">{relativeTime(view.live_last_updated_at)}</p>
             </div>
+          </div>
+
+          {/* Behavioral monitoring — task #365.  Reuses the operations
+              MonitoringPanel so the customer never needs to leave this
+              page to see SPRT / CUSUM / Bayesian verdicts in plain
+              language.  Visible only when the bot has produced closed
+              trades (active variant only). */}
+          <div
+            className="mt-4 space-y-2 border-t border-border pt-3"
+            data-testid="live-monitoring-section"
+          >
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Live behavior
+            </h4>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Real-time skill, drift, and win-rate verdicts derived
+              from this bot&apos;s closed trades.
+            </p>
+            <MonitoringPanel
+              report={monitoringReport}
+              isLoading={monitoringLoading}
+            />
           </div>
 
           <Link
