@@ -10,6 +10,12 @@
  *   - Current stage chip — the most-recently-active stage as derived
  *     from the lifecycle view.  Lets the user orient instantly:
  *     "Where am I in this strategy's life?"
+ *   - Design-horizon chip (when populated — i.e., the deep passport
+ *     resolved to a registered builtin) — the Tier-2 ADR's customer-
+ *     facing horizon claim.  Per ADR
+ *     `2026-05-17-customer-value-model-regime-cycling.md` this surface
+ *     is load-bearing for the "we'll tell you when you should cycle
+ *     out" framing.
  *
  * Stage-chip ordering (most-recently-active first match wins):
  *   1. Live operating (bot exists + closed trades > 0)
@@ -20,7 +26,7 @@
  *   6. Light backtest complete (default — passport row exists)
  */
 
-import { Hash } from 'lucide-react';
+import { Clock, Hash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { StrategyLifecycleView } from '@/types/api';
 
@@ -110,16 +116,57 @@ export function deriveCurrentStageChip(view: StrategyLifecycleView): CurrentStag
   };
 }
 
+/**
+ * Build the design-horizon chip copy.  Pure function so the rendering
+ * call site stays declarative.  Format mirrors the ADR copy guidance:
+ *   - When min === recommended: "Designed for {N}m+ evaluation"
+ *   - Otherwise:                "Designed for {min}–{rec}m evaluation"
+ *
+ * The tooltip carries the longer customer-facing explanation, including
+ * the "cycle out" framing from the customer-value model ADR.
+ */
+export function buildDesignHorizonChip(
+  view: StrategyLifecycleView,
+): { label: string; tooltip: string } | null {
+  const dh = view.design_horizon;
+  if (dh === null) return null;
+  const { min_window_months, recommended_window_months } = dh;
+  const label =
+    min_window_months === recommended_window_months
+      ? `Designed for ${recommended_window_months}m+ evaluation`
+      : `Designed for ${min_window_months}–${recommended_window_months}m evaluation`;
+  const tooltip =
+    `This strategy was designed against ${recommended_window_months} months of ` +
+    `evidence history.  Validation refuses to certify it on windows shorter than ` +
+    `${min_window_months} months because regime warmup and signal half-life aren't ` +
+    `observable yet.  These are EVALUATION-WINDOW lengths — not a commitment to ` +
+    `hold capital for ${recommended_window_months} months.  Cycle out below the ` +
+    `minimum window.`;
+  return { label, tooltip };
+}
+
 export default function StrategyHeader({ view }: StrategyHeaderProps) {
   const { relative, absolute } = relativeTime(view.originated_at);
   const chip = deriveCurrentStageChip(view);
+  const horizonChip = buildDesignHorizonChip(view);
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
       <div>
-        <div className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+        <div className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
           <span className="font-mono">{view.ticker}</span>
           <span className="text-muted-foreground">·</span>
           <span data-testid="strategy-class">{humaniseClass(view.strategy_class)}</span>
+          {horizonChip !== null && (
+            <Badge
+              variant="outline"
+              className="ml-1 gap-1 border-indigo-500/30 bg-indigo-500/10 text-xs font-normal text-indigo-700 dark:text-indigo-300"
+              title={horizonChip.tooltip}
+              data-testid="design-horizon-chip"
+            >
+              <Clock className="h-3 w-3" aria-hidden="true" />
+              <span>{horizonChip.label}</span>
+            </Badge>
+          )}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Strategy Lifecycle — originated{' '}

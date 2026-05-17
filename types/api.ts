@@ -1570,6 +1570,40 @@ export interface StrategyLifecycleView {
   live_open_position_count: number | null;
   /** ISO datetime — most-recent exit_date / entry_date. */
   live_last_updated_at: string | null;
+  /**
+   * Tier-2 design-horizon contract (per ADR
+   * `2026-05-16-tier2-design-horizon-consistency.md`).
+   *
+   * The underlying strategy author's declared evaluation-window contract.
+   * Mirrors :class:`algobrute.contracts.strategy_class.DesignHorizon`.
+   * `min_window_months` is the floor below which the strategy cannot be
+   * meaningfully evaluated; `recommended_window_months` is the window
+   * the strategy was designed against.
+   *
+   * `null` when the lifecycle has not yet promoted to a deep passport
+   * with a resolvable `strategy_id`, OR when the passport's
+   * `strategy_id` does not match a registered builtin.
+   *
+   * Window LENGTHS in calendar months — NOT a customer holding period.
+   * UX MUST surface the distinction ("Designed for Xm evaluation" is
+   * not "lock up capital for X months").
+   */
+  design_horizon: DesignHorizon | null;
+}
+
+/**
+ * Frozen dataclass mirror of :class:`algobrute.contracts.strategy_class.DesignHorizon`.
+ *
+ * Two evidence-window descriptors a strategy author commits to.  Per the
+ * Tier-2 ADR, validation surfaces refuse to certify a strategy on windows
+ * shorter than `min_window_months`; `recommended_window_months` is the
+ * window the customer-facing UX claims as the headline design horizon.
+ *
+ * Invariant: `min_window_months <= recommended_window_months`, both positive.
+ */
+export interface DesignHorizon {
+  min_window_months: number;
+  recommended_window_months: number;
 }
 
 /** POST /api/origination/strategies/{light_passport_id}/promote-to-deep */
